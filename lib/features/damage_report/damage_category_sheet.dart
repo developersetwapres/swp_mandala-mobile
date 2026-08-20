@@ -17,52 +17,72 @@ class DamageCategorySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.canvas,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Align(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.line,
-                  borderRadius: BorderRadius.circular(999),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.82,
+      minChildSize: 0.5,
+      maxChildSize: 0.94,
+      expand: false,
+      builder: (context, scrollController) {
+        return SafeArea(
+          top: false,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppColors.canvas,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Align(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.line,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Pilih kategori kerusakan',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Lihat contoh item agar laporan masuk ke tim yang tepat.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 17),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'Pilih kategori kerusakan',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              'Lihat contoh item agar laporan masuk ke tim yang tepat.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 17),
-            ...categories.map(
-              (category) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _CategoryOption(
-                  category: category,
-                  selected: category == selectedCategory,
-                  onTap: () => onSelected(category),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    itemCount: categories.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final category = categories[index];
+                      return _CategoryOption(
+                        category: category,
+                        selected: category == selectedCategory,
+                        onTap: () => onSelected(category),
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -80,9 +100,9 @@ class _CategoryOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (category.name) {
-      'Tata Suara' => Icons.speaker_group_outlined,
-      'Tata Udara' => Icons.air_rounded,
+    final icon = switch (category.name.toLowerCase()) {
+      'tata suara' => Icons.speaker_group_outlined,
+      'tata udara' => Icons.air_rounded,
       _ => Icons.category_outlined,
     };
 
@@ -146,7 +166,7 @@ class _CategoryOption extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        category.description,
+                        'Kode: ${category.code}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       if (category.examples.isNotEmpty) ...[

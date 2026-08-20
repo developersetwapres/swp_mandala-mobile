@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
+import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_models.dart';
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_booking_page.dart';
 
 import 'test_helpers.dart';
@@ -12,6 +13,7 @@ void main() {
       theme: AppTheme.light,
       home: MeetingRoomBookingPage(
         user: testUser,
+        repository: TestServiceCatalogRepository(),
         initialDate: DateTime.now().add(const Duration(days: 1)),
         initialStartTime: const TimeOfDay(hour: 9, minute: 0),
         initialEndTime: const TimeOfDay(hour: 12, minute: 0),
@@ -38,7 +40,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: const MeetingRoomBookingPage(user: testUser),
+        home: MeetingRoomBookingPage(
+          user: testUser,
+          repository: TestServiceCatalogRepository(),
+        ),
       ),
     );
 
@@ -53,6 +58,102 @@ void main() {
 
     expect(find.text('Pilih jam mulai terlebih dahulu, ya.'), findsOneWidget);
   });
+
+  testWidgets(
+    'valid schedule fetches real room states and all booked details',
+    (tester) async {
+      final repository = TestServiceCatalogRepository(
+        rooms: const [
+          MeetingRoom(
+            id: 'RPT-2V4N9',
+            name: 'Ruang Rapat Buton API',
+            code: 'RPT-2V4N9',
+            location: 'Gedung Sekretariat I Lantai 4',
+            capacity: '26+1',
+            maximumCapacityLabel: '26+1',
+            maximumCapacity: 27,
+            isAvailable: true,
+            islandName: 'Pulau Buton, Sulawesi Tenggara',
+            philosophy: 'Deskripsi filosofi dari API.',
+            bookedSlots: [],
+            bookedByBureaus: [],
+            facilities: ['tv-led'],
+            imageUrl: 'http://src.test/files/room.jpg',
+            descriptionImageUrl: 'http://src.test/files/island.png',
+          ),
+          MeetingRoom(
+            id: 'RPT-ISYWN',
+            name: 'Ruang Rapat Enggano',
+            code: 'RPT-ISYWN',
+            location: 'Gedung Sekretariat II Lantai 1',
+            capacity: '34+1',
+            maximumCapacityLabel: '50+1',
+            maximumCapacity: 51,
+            isAvailable: false,
+            islandName: 'Pulau Enggano, Bengkulu',
+            philosophy: 'Permata terluar Indonesia.',
+            bookedSlots: ['09:00 - 15:00', '16:00 - 17:00'],
+            bookedByBureaus: ['Biro A', 'Biro B'],
+            facilities: ['tv-led', 'kamera'],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: MeetingRoomBookingPage(
+            user: testUser,
+            repository: repository,
+            initialDate: DateTime.now().add(const Duration(days: 1)),
+            initialStartTime: const TimeOfDay(hour: 8, minute: 0),
+            initialEndTime: const TimeOfDay(hour: 10, minute: 0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.roomCalls, 1);
+      expect(find.text('Ruang Rapat Buton API'), findsOneWidget);
+      expect(find.text('Ruang Rapat Enggano'), findsOneWidget);
+      expect(
+        find.textContaining('09:00 - 15:00, 16:00 - 17:00'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Biro A, Biro B'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('room_rpt-isywn')));
+      await tester.tap(find.byKey(const Key('room_rpt-isywn')));
+      await tester.pump();
+      expect(find.byKey(const Key('participant_field')), findsNothing);
+
+      await tester.ensureVisible(find.byKey(const Key('room_rpt-2v4n9')));
+      await tester.tap(find.byKey(const Key('room_rpt-2v4n9')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('participant_field')), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('detail_rpt-2v4n9')));
+      await tester.tap(find.byKey(const Key('detail_rpt-2v4n9')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widgetList<Image>(find.byType(Image))
+            .any((image) => image.image is NetworkImage),
+        isTrue,
+      );
+      await tester.scrollUntilVisible(
+        find.text('Deskripsi filosofi dari API.'),
+        280,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('Deskripsi filosofi dari API.'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('tv led'),
+        220,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('tv led'), findsOneWidget);
+    },
+  );
 
   testWidgets('room detail opens in a contextual bottom sheet', (tester) async {
     await tester.pumpWidget(bookingWithValidSchedule());
@@ -80,7 +181,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ruang Rapat Buton'), findsOneWidget);
-    expect(find.text('Telah Dipesan'), findsNWidgets(2));
+    expect(find.text('Telah Dipesan'), findsOneWidget);
     expect(find.byKey(const Key('participant_field')), findsNothing);
 
     await tester.ensureVisible(find.byKey(const Key('room_buton')));
@@ -151,7 +252,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: const MeetingRoomBookingPage(user: testUser),
+        home: MeetingRoomBookingPage(
+          user: testUser,
+          repository: TestServiceCatalogRepository(),
+        ),
       ),
     );
 

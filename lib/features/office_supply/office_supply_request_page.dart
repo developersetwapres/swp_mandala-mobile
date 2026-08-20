@@ -3,14 +3,22 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/domain/app_user.dart';
+import '../auth/presentation/auth_scope.dart';
+import '../service_catalog/domain/service_catalog_failure.dart';
+import '../service_catalog/domain/service_catalog_repository.dart';
 import 'office_supply_models.dart';
 import 'office_supply_selector_sheet.dart';
 import 'supply_item_editor_sheet.dart';
 
 class OfficeSupplyRequestPage extends StatefulWidget {
-  const OfficeSupplyRequestPage({required this.user, super.key});
+  const OfficeSupplyRequestPage({
+    required this.user,
+    required this.repository,
+    super.key,
+  });
 
   final AppUser user;
+  final ServiceCatalogRepository repository;
 
   @override
   State<OfficeSupplyRequestPage> createState() =>
@@ -18,114 +26,14 @@ class OfficeSupplyRequestPage extends StatefulWidget {
 }
 
 class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
-  static const List<OfficeSupply> _masterSupplies = [
-    OfficeSupply(
-      id: 'other',
-      name: 'Lain-Lain',
-      unit: null,
-      icon: Icons.add_box_outlined,
-      description: 'Tambahkan barang yang belum ada di daftar.',
-      isOther: true,
-    ),
-    OfficeSupply(
-      id: 'pen',
-      name: 'Pulpen',
-      unit: 'Pcs',
-      icon: Icons.edit_rounded,
-      description: 'Pulpen kerja harian',
-    ),
-    OfficeSupply(
-      id: 'pencil',
-      name: 'Pensil',
-      unit: 'Pcs',
-      icon: Icons.draw_outlined,
-      description: 'Pensil tulis',
-    ),
-    OfficeSupply(
-      id: 'notebook',
-      name: 'Buku Tulis',
-      unit: 'Pcs',
-      icon: Icons.menu_book_outlined,
-      description: 'Buku catatan kerja',
-    ),
-    OfficeSupply(
-      id: 'paper_a4',
-      name: 'Kertas A4',
-      unit: 'Rim',
-      icon: Icons.description_outlined,
-      description: 'Kertas cetak ukuran A4',
-    ),
-    OfficeSupply(
-      id: 'paper_f4',
-      name: 'Kertas F4',
-      unit: 'Rim',
-      icon: Icons.description_outlined,
-      description: 'Kertas cetak ukuran F4',
-    ),
-    OfficeSupply(
-      id: 'folder',
-      name: 'Map',
-      unit: 'Pcs',
-      icon: Icons.folder_outlined,
-      description: 'Map dokumen kantor',
-    ),
-    OfficeSupply(
-      id: 'binder_clip',
-      name: 'Binder Clip',
-      unit: 'Box',
-      icon: Icons.inventory_2_outlined,
-      description: 'Penjepit dokumen',
-    ),
-    OfficeSupply(
-      id: 'stapler',
-      name: 'Stapler',
-      unit: 'Pcs',
-      icon: Icons.content_paste_outlined,
-      description: 'Stapler meja',
-    ),
-    OfficeSupply(
-      id: 'stapler_refill',
-      name: 'Isi Stapler',
-      unit: 'Box',
-      icon: Icons.view_module_outlined,
-      description: 'Isi ulang stapler',
-    ),
-    OfficeSupply(
-      id: 'marker',
-      name: 'Spidol',
-      unit: 'Pcs',
-      icon: Icons.brush_outlined,
-      description: 'Spidol papan tulis',
-    ),
-    OfficeSupply(
-      id: 'sticky_notes',
-      name: 'Sticky Notes',
-      unit: 'Pack',
-      icon: Icons.sticky_note_2_outlined,
-      description: 'Kertas catatan berperekat',
-    ),
-    OfficeSupply(
-      id: 'eraser',
-      name: 'Penghapus',
-      unit: 'Pcs',
-      icon: Icons.auto_fix_normal_outlined,
-      description: 'Penghapus pensil',
-    ),
-    OfficeSupply(
-      id: 'envelope',
-      name: 'Amplop',
-      unit: 'Box',
-      icon: Icons.mail_outline_rounded,
-      description: 'Amplop dokumen',
-    ),
-    OfficeSupply(
-      id: 'printer_ink',
-      name: 'Tinta Printer',
-      unit: 'Botol',
-      icon: Icons.print_outlined,
-      description: 'Tinta isi ulang printer',
-    ),
-  ];
+  static const OfficeSupply _otherSupply = OfficeSupply(
+    id: 'other',
+    name: 'Lain-Lain',
+    unit: null,
+    icon: Icons.add_box_outlined,
+    description: 'Tambahkan barang yang belum ada di daftar.',
+    isOther: true,
+  );
 
   final _noteController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -133,6 +41,9 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
   final List<RequestedSupply> _requestedItems = [];
 
   bool _phoneTouched = false;
+  List<OfficeSupply> _masterSupplies = const [_otherSupply];
+  bool _isLoadingSupplies = true;
+  String? _supplyError;
 
   @override
   void initState() {
@@ -142,6 +53,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
         setState(() => _phoneTouched = true);
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSupplies());
   }
 
   @override
@@ -217,6 +129,23 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
                             onDecrease: (item) => _changeQuantity(item, -1),
                             onIncrease: (item) => _changeQuantity(item, 1),
                           ),
+                          if (_isLoadingSupplies ||
+                              _supplyError != null ||
+                              (!_isLoadingSupplies &&
+                                  _masterSupplies.length == 1)) ...[
+                            const SizedBox(height: 12),
+                            _SupplyCatalogNotice(
+                              loading: _isLoadingSupplies,
+                              message:
+                                  _supplyError ??
+                                  (_masterSupplies.length == 1
+                                      ? 'Data ATK belum tersedia. Opsi Lain-Lain tetap dapat digunakan.'
+                                      : ''),
+                              onRetry: _supplyError == null
+                                  ? null
+                                  : () => _loadSupplies(forceRefresh: true),
+                            ),
+                          ],
                           const SizedBox(height: 32),
                           const _SectionIntro(
                             number: '03',
@@ -261,6 +190,14 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
 
   Future<void> _openSupplySelector() async {
     FocusManager.instance.primaryFocus?.unfocus();
+    if (_isLoadingSupplies) {
+      _showMessage('Daftar ATK sedang dimuat…');
+      return;
+    }
+    if (_supplyError != null) {
+      _loadSupplies(forceRefresh: true);
+      return;
+    }
     final selectedIds = _requestedItems
         .map((item) => item.masterId)
         .whereType<String>()
@@ -291,6 +228,34 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
     }
 
     await _openItemEditor(supply: supply);
+  }
+
+  Future<void> _loadSupplies({bool forceRefresh = false}) async {
+    setState(() {
+      _isLoadingSupplies = true;
+      _supplyError = null;
+    });
+    try {
+      final supplies = await widget.repository.getAvailableOfficeSupplies(
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() => _masterSupplies = [_otherSupply, ...supplies]);
+    } on ServiceCatalogFailure catch (failure) {
+      if (!mounted) return;
+      if (failure.type == ServiceCatalogFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      setState(() => _supplyError = failure.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _supplyError = 'Daftar ATK belum dapat dimuat.');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingSupplies = false);
+    }
   }
 
   Future<void> _editItem(RequestedSupply item) async {
@@ -498,6 +463,56 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
           duration: const Duration(seconds: 2),
         ),
       );
+  }
+}
+
+class _SupplyCatalogNotice extends StatelessWidget {
+  const _SupplyCatalogNotice({
+    required this.loading,
+    required this.message,
+    this.onRetry,
+  });
+
+  final bool loading;
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.primaryPale,
+        borderRadius: BorderRadius.circular(17),
+      ),
+      child: Row(
+        children: [
+          if (loading)
+            const SizedBox(
+              width: 19,
+              height: 19,
+              child: CircularProgressIndicator(strokeWidth: 2.2),
+            )
+          else
+            const Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.primaryStrong,
+              size: 20,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              loading ? 'Memuat daftar ATK…' : message,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.primaryDeep),
+            ),
+          ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
+        ],
+      ),
+    );
   }
 }
 

@@ -26,7 +26,7 @@ void main() {
     () async {
       final storage = _MemoryTokenStorage();
       final client = MockClient((request) async {
-        expect(request.url.toString(), 'http://src.test/api/login');
+        expect(request.url.toString(), 'http://src.test/api/auth/login');
         expect(request.method, 'POST');
         expect(request.headers['Accept'], 'application/json');
         expect(request.headers['Content-Type'], 'application/json');

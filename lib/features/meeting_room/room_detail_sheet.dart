@@ -66,9 +66,9 @@ class RoomDetailSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(24),
                       child: AspectRatio(
                         aspectRatio: 1.55,
-                        child: Image.asset(
-                          'assets/images/meeting_room.jpg',
-                          fit: BoxFit.cover,
+                        child: _RoomImage(
+                          url: room.imageUrl,
+                          fallbackAsset: 'assets/images/meeting_room.jpg',
                           semanticLabel: 'Foto ${room.name}',
                         ),
                       ),
@@ -128,7 +128,7 @@ class RoomDetailSheet extends StatelessWidget {
                           child: _FactTile(
                             icon: Icons.group_add_outlined,
                             label: 'Kapasitas maksimum',
-                            value: '${room.maximumCapacity} orang',
+                            value: '${room.maximumCapacityLabel} orang',
                           ),
                         ),
                       ],
@@ -156,10 +156,10 @@ class RoomDetailSheet extends StatelessWidget {
                         children: [
                           AspectRatio(
                             aspectRatio: 2.15,
-                            child: Image.asset(
-                              'assets/images/island.jpg',
-                              fit: BoxFit.cover,
-                              semanticLabel: 'Foto Pulau ${room.islandName}',
+                            child: _RoomImage(
+                              url: room.descriptionImageUrl,
+                              fallbackAsset: 'assets/images/island.jpg',
+                              semanticLabel: 'Foto ${room.islandName}',
                             ),
                           ),
                           Padding(
@@ -168,22 +168,56 @@ class RoomDetailSheet extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Pulau ${room.islandName}',
+                                  room.islandName,
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleMedium,
                                 ),
                                 const SizedBox(height: 7),
-                                Text(
-                                  room.philosophy,
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
+                                if (room.philosophy.isNotEmpty)
+                                  Text(
+                                    room.philosophy,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium,
+                                  ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
+                    if (room.facilities.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        'Fasilitas ruangan',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: room.facilities
+                            .map(
+                              (facility) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 11,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  facility.replaceAll('-', ' '),
+                                  style: Theme.of(context).textTheme.labelMedium
+                                      ?.copyWith(color: AppColors.primaryDeep),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -191,6 +225,45 @@ class RoomDetailSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _RoomImage extends StatelessWidget {
+  const _RoomImage({
+    required this.url,
+    required this.fallbackAsset,
+    required this.semanticLabel,
+  });
+
+  final String? url;
+  final String fallbackAsset;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null) {
+      return Image.asset(
+        fallbackAsset,
+        fit: BoxFit.cover,
+        semanticLabel: semanticLabel,
+      );
+    }
+    return Image.network(
+      url!,
+      fit: BoxFit.cover,
+      semanticLabel: semanticLabel,
+      loadingBuilder: (context, child, progress) => progress == null
+          ? child
+          : const ColoredBox(
+              color: AppColors.primaryPale,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+      errorBuilder: (context, error, stackTrace) => Image.asset(
+        fallbackAsset,
+        fit: BoxFit.cover,
+        semanticLabel: semanticLabel,
+      ),
     );
   }
 }

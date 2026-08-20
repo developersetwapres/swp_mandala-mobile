@@ -24,9 +24,15 @@ class ApiClient {
   Future<Map<String, dynamic>> get(
     String path, {
     bool authenticated = false,
+    Map<String, String>? queryParameters,
   }) async {
     final headers = await _headers(authenticated: authenticated);
-    return _send(() => _client.get(_uri(path), headers: headers));
+    return _send(
+      () => _client.get(
+        _uri(path, queryParameters: queryParameters),
+        headers: headers,
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> post(
@@ -44,9 +50,12 @@ class ApiClient {
     );
   }
 
-  Uri _uri(String path) {
+  Uri _uri(String path, {Map<String, String>? queryParameters}) {
     final normalizedPath = path.replaceFirst(RegExp(r'^/+'), '');
-    return Uri.parse('$_baseUrl/$normalizedPath');
+    final uri = Uri.parse('$_baseUrl/$normalizedPath');
+    return queryParameters == null || queryParameters.isEmpty
+        ? uri
+        : uri.replace(queryParameters: queryParameters);
   }
 
   Future<Map<String, String>> _headers({required bool authenticated}) async {

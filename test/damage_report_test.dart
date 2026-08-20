@@ -32,7 +32,11 @@ void main() {
   Widget reportApp(_FakeMediaPicker picker) {
     return MaterialApp(
       theme: AppTheme.light,
-      home: DamageReportPage(user: testUser, mediaPicker: picker),
+      home: DamageReportPage(
+        user: testUser,
+        repository: TestServiceCatalogRepository(),
+        mediaPicker: picker,
+      ),
     );
   }
 
@@ -74,6 +78,48 @@ void main() {
     expect(find.text('Tata Udara'), findsOneWidget);
     expect(find.text('AC, Exhaust Fan, Kipas Angin'), findsOneWidget);
   });
+
+  testWidgets(
+    'real damage category displays API name, code, and subcategories',
+    (tester) async {
+      final repository = TestServiceCatalogRepository(
+        categories: const [
+          DamageCategory(
+            id: 9,
+            code: 'KRN-JDV6F',
+            name: 'Furniture',
+            examples: ['Meja', 'Kursi', 'Lemari Built-in', 'Credenza'],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        testApp(
+          home: DamageReportPage(
+            user: testUser,
+            repository: repository,
+            mediaPicker: _FakeMediaPicker(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('category_picker')));
+      await tester.tap(find.byKey(const Key('category_picker')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Furniture'), findsOneWidget);
+      expect(find.text('Kode: KRN-JDV6F'), findsOneWidget);
+      expect(
+        find.text('Termasuk: Meja, Kursi, Lemari Built-in, Credenza'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('category_furniture')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Meja, Kursi, Lemari Built-in, Credenza'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('valid image and video show previews and can be removed', (
     tester,

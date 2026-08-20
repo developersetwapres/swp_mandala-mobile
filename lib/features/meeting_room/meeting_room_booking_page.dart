@@ -3,12 +3,16 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/domain/app_user.dart';
+import '../auth/presentation/auth_scope.dart';
+import '../service_catalog/domain/service_catalog_failure.dart';
+import '../service_catalog/domain/service_catalog_repository.dart';
 import 'meeting_room_models.dart';
 import 'room_detail_sheet.dart';
 
 class MeetingRoomBookingPage extends StatefulWidget {
   const MeetingRoomBookingPage({
     required this.user,
+    required this.repository,
     super.key,
     this.initialDate,
     this.initialStartTime,
@@ -16,6 +20,7 @@ class MeetingRoomBookingPage extends StatefulWidget {
   });
 
   final AppUser user;
+  final ServiceCatalogRepository repository;
   final DateTime? initialDate;
   final TimeOfDay? initialStartTime;
   final TimeOfDay? initialEndTime;
@@ -25,49 +30,6 @@ class MeetingRoomBookingPage extends StatefulWidget {
 }
 
 class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
-  static const List<MeetingRoom> _rooms = [
-    MeetingRoom(
-      name: 'Ruang Rapat Buton',
-      location: 'Gedung 2, Lantai 3',
-      capacity: 10,
-      maximumCapacity: 14,
-      isAvailable: true,
-      islandName: 'Buton',
-      philosophy: 'Buton melambangkan keteguhan dan kolaborasi. Ruang ini dirancang untuk percakapan yang fokus, hangat, dan menghasilkan keputusan bersama.',
-    ),
-    MeetingRoom(
-      name: 'Ruang Rapat Bali',
-      location: 'Gedung 1, Lantai 2',
-      capacity: 8,
-      maximumCapacity: 10,
-      isAvailable: false,
-      bookedTime: '09.00–12.00',
-      bookedBy: 'Biro Umum',
-      islandName: 'Bali',
-      philosophy: 'Bali membawa filosofi harmoni antara manusia, lingkungan, dan tujuan bersama—semangat yang hidup dalam setiap pertemuan di ruangan ini.',
-    ),
-    MeetingRoom(
-      name: 'Ruang Rapat Sumatera',
-      location: 'Gedung 2, Lantai 5',
-      capacity: 16,
-      maximumCapacity: 20,
-      isAvailable: true,
-      islandName: 'Sumatera',
-      philosophy: 'Sumatera merepresentasikan kekuatan, keluasan gagasan, dan keberagaman sudut pandang untuk mendukung diskusi berskala lebih besar.',
-    ),
-    MeetingRoom(
-      name: 'Ruang Rapat Papua',
-      location: 'Gedung 3, Lantai 2',
-      capacity: 12,
-      maximumCapacity: 16,
-      isAvailable: false,
-      bookedTime: '13.00–15.30',
-      bookedBy: 'Biro Keuangan',
-      islandName: 'Papua',
-      philosophy: 'Papua mengajarkan keberanian menjelajah gagasan baru. Ruang ini menjadi tempat tumbuhnya pemikiran terbuka dan solusi yang bermakna.',
-    ),
-  ];
-
   final _participantController = TextEditingController();
   final _activityController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -84,6 +46,10 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   bool _participantTouched = false;
   bool _hybridMeeting = false;
   bool _itSupport = false;
+  List<MeetingRoom> _rooms = const [];
+  bool _isLoadingRooms = false;
+  String? _roomError;
+  int _roomRequestGeneration = 0;
 
   @override
   void initState() {
@@ -91,6 +57,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     _selectedDate = widget.initialDate;
     _startTime = widget.initialStartTime;
     _endTime = widget.initialEndTime;
+    if (_isScheduleValid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadRooms());
+    }
   }
 
   @override
@@ -245,13 +214,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                                   ),
                                 ),
                             child: _isScheduleValid
-                                ? _RoomAvailabilitySection(
-                                    key: const ValueKey('room_list'),
-                                    rooms: _rooms,
-                                    selectedRoom: _selectedRoom,
-                                    onSelect: _selectRoom,
-                                    onDetail: _showRoomDetail,
-                                  )
+                                ? _buildRoomAvailability()
                                 : const _ScheduleGate(
                                     key: ValueKey('schedule_gate'),
                                   ),
@@ -342,6 +305,40 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
   }
 
+  Widget _buildRoomAvailability() {
+    if (_isLoadingRooms) {
+      return const _RoomCatalogMessage(
+        key: ValueKey('room_loading'),
+        icon: Icons.sync_rounded,
+        message: 'Memeriksa ketersediaan ruangan…',
+        loading: true,
+      );
+    }
+    if (_roomError != null) {
+      return _RoomCatalogMessage(
+        key: const ValueKey('room_error'),
+        icon: Icons.cloud_off_outlined,
+        message: _roomError!,
+        actionLabel: 'Coba lagi',
+        onAction: _loadRooms,
+      );
+    }
+    if (_rooms.isEmpty) {
+      return const _RoomCatalogMessage(
+        key: ValueKey('room_empty'),
+        icon: Icons.event_busy_outlined,
+        message: 'Tidak ada ruangan yang tersedia untuk jadwal ini.',
+      );
+    }
+    return _RoomAvailabilitySection(
+      key: const ValueKey('room_list'),
+      rooms: _rooms,
+      selectedRoom: _selectedRoom,
+      onSelect: _selectRoom,
+      onDetail: _showRoomDetail,
+    );
+  }
+
   String? get _scheduleError {
     if (_selectedDate != null) {
       final day = DateTime(
@@ -374,6 +371,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       _selectedRoom = null;
       _timeError = null;
     });
+    _refreshRoomsIfScheduleValid();
   }
 
   Future<void> _pickStartTime() async {
@@ -396,6 +394,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         _timeError = null;
       }
     });
+    _refreshRoomsIfScheduleValid();
   }
 
   Future<void> _pickEndTime() async {
@@ -429,6 +428,57 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         _timeError = null;
       }
     });
+    _refreshRoomsIfScheduleValid();
+  }
+
+  void _refreshRoomsIfScheduleValid() {
+    if (_isScheduleValid) {
+      _loadRooms();
+    } else {
+      _roomRequestGeneration += 1;
+      setState(() {
+        _rooms = const [];
+        _roomError = null;
+        _isLoadingRooms = false;
+      });
+    }
+  }
+
+  Future<void> _loadRooms() async {
+    if (!_isScheduleValid) return;
+    final requestGeneration = ++_roomRequestGeneration;
+    setState(() {
+      _isLoadingRooms = true;
+      _roomError = null;
+      _selectedRoom = null;
+    });
+
+    try {
+      final rooms = await widget.repository.getAvailableRooms(
+        date: _selectedDate!,
+        startHour: _startTime!.hour,
+        startMinute: _startTime!.minute,
+        endHour: _endTime!.hour,
+        endMinute: _endTime!.minute,
+      );
+      if (!mounted || requestGeneration != _roomRequestGeneration) return;
+      setState(() => _rooms = rooms);
+    } on ServiceCatalogFailure catch (failure) {
+      if (!mounted || requestGeneration != _roomRequestGeneration) return;
+      if (failure.type == ServiceCatalogFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      setState(() => _roomError = failure.message);
+    } catch (_) {
+      if (!mounted || requestGeneration != _roomRequestGeneration) return;
+      setState(() => _roomError = 'Data ruangan belum dapat dimuat.');
+    } finally {
+      if (mounted && requestGeneration == _roomRequestGeneration) {
+        setState(() => _isLoadingRooms = false);
+      }
+    }
   }
 
   void _selectRoom(MeetingRoom room) {
@@ -942,6 +992,68 @@ class _ScheduleGate extends StatelessWidget {
   }
 }
 
+class _RoomCatalogMessage extends StatelessWidget {
+  const _RoomCatalogMessage({
+    required this.icon,
+    required this.message,
+    this.loading = false,
+    this.actionLabel,
+    this.onAction,
+    super.key,
+  });
+
+  final IconData icon;
+  final String message;
+  final bool loading;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionIntro(
+          number: '03',
+          title: 'Pilih ruangan',
+          subtitle: 'Ketersediaan sesuai jadwal yang kamu pilih.',
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryPale,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.3),
+                )
+              else
+                Icon(icon, color: AppColors.primaryStrong, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.primaryDeep),
+                ),
+              ),
+              if (onAction != null)
+                TextButton(onPressed: onAction, child: Text(actionLabel!)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _RoomAvailabilitySection extends StatelessWidget {
   const _RoomAvailabilitySection({
     super.key,
@@ -1006,7 +1118,7 @@ class _RoomCard extends StatelessWidget {
         : AppColors.coralSoft;
 
     return AnimatedContainer(
-      key: Key('room_${room.islandName.toLowerCase()}'),
+      key: Key('room_${room.id.toLowerCase()}'),
       duration: const Duration(milliseconds: 190),
       decoration: BoxDecoration(
         color: selected ? AppColors.primaryPale : AppColors.surface,
@@ -1069,7 +1181,7 @@ class _RoomCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${room.capacity} orang · Maks. ${room.maximumCapacity}',
+                            '${room.capacity} orang · Maks. ${room.maximumCapacityLabel}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -1103,7 +1215,7 @@ class _RoomCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Text(
-                      'Ruangan sedang digunakan pada ${room.bookedTime} oleh ${room.bookedBy}.',
+                      room.bookedInformation,
                       style: Theme.of(context).textTheme.bodySmall
                           ?.copyWith(color: AppColors.inkSoft),
                     ),
@@ -1113,7 +1225,7 @@ class _RoomCard extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
-                    key: Key('detail_${room.islandName.toLowerCase()}'),
+                    key: Key('detail_${room.id.toLowerCase()}'),
                     onPressed: onDetail,
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.primaryStrong,

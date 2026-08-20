@@ -36,6 +36,7 @@ class _OfficeSupplySelectorSheetState extends State<OfficeSupplySelectorSheet> {
           (supply) =>
               supply.name.toLowerCase().contains(query) ||
               supply.description.toLowerCase().contains(query) ||
+              (supply.categoryName?.toLowerCase().contains(query) ?? false) ||
               (supply.unit?.toLowerCase().contains(query) ?? false),
         )
         .toList();
@@ -90,7 +91,7 @@ class _OfficeSupplySelectorSheetState extends State<OfficeSupplySelectorSheet> {
                       autofocus: false,
                       onChanged: (value) => setState(() => _query = value),
                       decoration: InputDecoration(
-                        hintText: 'Cari nama ATK atau satuan',
+                        hintText: 'Cari nama ATK, kategori, atau satuan',
                         prefixIcon: const Icon(Icons.search_rounded),
                         suffixIcon: _query.isEmpty
                             ? null

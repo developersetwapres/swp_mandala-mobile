@@ -3,15 +3,24 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/domain/app_user.dart';
+import '../auth/presentation/auth_scope.dart';
+import '../service_catalog/domain/service_catalog_failure.dart';
+import '../service_catalog/domain/service_catalog_repository.dart';
 import 'damage_category_sheet.dart';
 import 'damage_media_source_sheet.dart';
 import 'damage_report_models.dart';
 import 'image_picker_damage_media_picker.dart';
 
 class DamageReportPage extends StatefulWidget {
-  const DamageReportPage({required this.user, super.key, this.mediaPicker});
+  const DamageReportPage({
+    required this.user,
+    required this.repository,
+    super.key,
+    this.mediaPicker,
+  });
 
   final AppUser user;
+  final ServiceCatalogRepository repository;
   final DamageMediaPicker? mediaPicker;
 
   @override
@@ -21,24 +30,6 @@ class DamageReportPage extends StatefulWidget {
 class _DamageReportPageState extends State<DamageReportPage> {
   static const int _maximumFiles = 2;
   static const int _maximumFileSize = 20 * 1024 * 1024;
-
-  static const List<DamageCategory> _categories = [
-    DamageCategory(
-      name: 'Tata Suara',
-      examples: ['Mic Conference', 'Public Address'],
-      description: 'Perangkat audio dan sistem pengeras suara.',
-    ),
-    DamageCategory(
-      name: 'Tata Udara',
-      examples: ['AC', 'Exhaust Fan', 'Kipas Angin'],
-      description: 'Pendingin dan sirkulasi udara ruangan.',
-    ),
-    DamageCategory(
-      name: 'Lain-Lain',
-      examples: [],
-      description: 'Untuk kerusakan di luar kategori yang tersedia.',
-    ),
-  ];
 
   final _locationController = TextEditingController();
   final _itemController = TextEditingController();
@@ -60,6 +51,9 @@ class _DamageReportPageState extends State<DamageReportPage> {
   bool _itemTouched = false;
   bool _descriptionTouched = false;
   bool _phoneTouched = false;
+  List<DamageCategory> _categories = const [];
+  bool _isLoadingCategories = true;
+  String? _categoryError;
 
   @override
   void initState() {
@@ -69,7 +63,10 @@ class _DamageReportPageState extends State<DamageReportPage> {
     _itemFocus.addListener(() => _markTouchedOnBlur('item'));
     _descriptionFocus.addListener(() => _markTouchedOnBlur('description'));
     _phoneFocus.addListener(() => _markTouchedOnBlur('phone'));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostMedia());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recoverLostMedia();
+      _loadCategories();
+    });
   }
 
   @override
@@ -176,6 +173,23 @@ class _DamageReportPageState extends State<DamageReportPage> {
                             onChanged: (_) => setState(() {}),
                             onChooseCategory: _showCategoryPicker,
                           ),
+                          if (_isLoadingCategories ||
+                              _categoryError != null ||
+                              (!_isLoadingCategories &&
+                                  _categories.isEmpty)) ...[
+                            const SizedBox(height: 12),
+                            _CatalogLoadNotice(
+                              loading: _isLoadingCategories,
+                              message:
+                                  _categoryError ??
+                                  (_categories.isEmpty
+                                      ? 'Kategori kerusakan belum tersedia.'
+                                      : ''),
+                              onRetry: _categoryError == null
+                                  ? null
+                                  : () => _loadCategories(forceRefresh: true),
+                            ),
+                          ],
                           const SizedBox(height: 32),
                           const _SectionIntro(
                             number: '03',
@@ -266,6 +280,18 @@ class _DamageReportPageState extends State<DamageReportPage> {
 
   void _showCategoryPicker() {
     FocusManager.instance.primaryFocus?.unfocus();
+    if (_isLoadingCategories) {
+      _showCatalogMessage('Kategori kerusakan sedang dimuat…');
+      return;
+    }
+    if (_categoryError != null) {
+      _loadCategories(forceRefresh: true);
+      return;
+    }
+    if (_categories.isEmpty) {
+      _showCatalogMessage('Kategori kerusakan belum tersedia.');
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -280,6 +306,45 @@ class _DamageReportPageState extends State<DamageReportPage> {
         },
       ),
     );
+  }
+
+  Future<void> _loadCategories({bool forceRefresh = false}) async {
+    setState(() {
+      _isLoadingCategories = true;
+      _categoryError = null;
+    });
+    try {
+      final categories = await widget.repository.getDamageCategories(
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() => _categories = categories);
+    } on ServiceCatalogFailure catch (failure) {
+      if (!mounted) return;
+      if (failure.type == ServiceCatalogFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      setState(() => _categoryError = failure.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _categoryError = 'Kategori kerusakan belum dapat dimuat.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingCategories = false);
+    }
+  }
+
+  void _showCatalogMessage(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), margin: const EdgeInsets.all(20)),
+      );
   }
 
   void _showMediaSourcePicker() {
@@ -408,6 +473,56 @@ class _DamageReportPageState extends State<DamageReportPage> {
           margin: const EdgeInsets.all(20),
         ),
       );
+  }
+}
+
+class _CatalogLoadNotice extends StatelessWidget {
+  const _CatalogLoadNotice({
+    required this.loading,
+    required this.message,
+    this.onRetry,
+  });
+
+  final bool loading;
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.primaryPale,
+        borderRadius: BorderRadius.circular(17),
+      ),
+      child: Row(
+        children: [
+          if (loading)
+            const SizedBox(
+              width: 19,
+              height: 19,
+              child: CircularProgressIndicator(strokeWidth: 2.2),
+            )
+          else
+            const Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.primaryStrong,
+              size: 20,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              loading ? 'Memuat kategori kerusakan…' : message,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.primaryDeep),
+            ),
+          ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
+        ],
+      ),
+    );
   }
 }
 
@@ -737,7 +852,7 @@ class _DamageIdentityPanel extends StatelessWidget {
                             category == null
                                 ? 'Lihat kategori dan contoh item'
                                 : category!.examples.isEmpty
-                                ? category!.description
+                                ? 'Kode ${category!.code}'
                                 : category!.examples.join(', '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

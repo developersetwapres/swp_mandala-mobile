@@ -9,6 +9,8 @@ import 'features/auth/data/remote_auth_repository.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/auth/presentation/auth_scope.dart';
+import 'features/service_catalog/data/remote_service_catalog_repository.dart';
+import 'features/service_catalog/domain/service_catalog_repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,15 +25,28 @@ void main() {
     tokenStorage: tokenStorage,
   );
   final authController = AuthController(authRepository);
+  final serviceCatalogRepository = RemoteServiceCatalogRepository(
+    apiClient: apiClient,
+  );
 
-  runApp(MandalaApp(authController: authController));
+  runApp(
+    MandalaApp(
+      authController: authController,
+      serviceCatalogRepository: serviceCatalogRepository,
+    ),
+  );
   authController.initialize();
 }
 
 class MandalaApp extends StatelessWidget {
-  const MandalaApp({required this.authController, super.key});
+  const MandalaApp({
+    required this.authController,
+    required this.serviceCatalogRepository,
+    super.key,
+  });
 
   final AuthController authController;
+  final ServiceCatalogRepository serviceCatalogRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +59,10 @@ class MandalaApp extends StatelessWidget {
         locale: const Locale('id', 'ID'),
         supportedLocales: const [Locale('id', 'ID')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        home: AuthGate(controller: authController),
+        home: AuthGate(
+          controller: authController,
+          serviceCatalogRepository: serviceCatalogRepository,
+        ),
       ),
     );
   }

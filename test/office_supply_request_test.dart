@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/office_supply/office_supply_request_page.dart';
+import 'package:swp_mandala_mobile/features/office_supply/office_supply_models.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_catalog_failure.dart';
 
 import 'test_helpers.dart';
 
@@ -10,7 +12,10 @@ void main() {
   Widget requestApp() {
     return MaterialApp(
       theme: AppTheme.light,
-      home: const OfficeSupplyRequestPage(user: testUser),
+      home: OfficeSupplyRequestPage(
+        user: testUser,
+        repository: TestServiceCatalogRepository(),
+      ),
     );
   }
 
@@ -73,6 +78,65 @@ void main() {
     expect(find.text('Kertas A4'), findsOneWidget);
     expect(find.text('Kertas F4'), findsOneWidget);
     expect(find.text('Pulpen'), findsNothing);
+  });
+
+  testWidgets('real ATK keeps Lain-Lain first and applies API unit/category', (
+    tester,
+  ) async {
+    final repository = TestServiceCatalogRepository(
+      supplies: const [
+        OfficeSupply(
+          id: '353',
+          name: 'Amplop Coklat A3 Logo Bintang',
+          unit: 'Buah',
+          icon: Icons.inventory_2_outlined,
+          description: 'AMPLOP',
+          categoryId: 36,
+          categoryName: 'AMPLOP',
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      testApp(
+        home: OfficeSupplyRequestPage(user: testUser, repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await openSelector(tester);
+
+    final options = tester.widgetList<InkWell>(find.byType(InkWell)).toList();
+    expect(find.byKey(const Key('supply_other')), findsOneWidget);
+    expect(find.byKey(const Key('supply_353')), findsOneWidget);
+    expect(options, isNotEmpty);
+
+    await tester.enterText(
+      find.byKey(const Key('supply_search_field')),
+      'AMPLOP',
+    );
+    await tester.pump();
+    expect(find.text('Amplop Coklat A3 Logo Bintang'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('supply_353')));
+    await tester.pumpAndSettle();
+    expect(find.text('Buah'), findsOneWidget);
+  });
+
+  testWidgets('ATK connection error is friendly and retryable', (tester) async {
+    final repository = TestServiceCatalogRepository(
+      supplyError: const ServiceCatalogFailure(
+        ServiceCatalogFailureType.connection,
+        'Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi.',
+      ),
+    );
+    await tester.pumpWidget(
+      testApp(
+        home: OfficeSupplyRequestPage(user: testUser, repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Tidak dapat terhubung'), findsOneWidget);
+    expect(find.text('Coba lagi'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('existing ATK uses its unit and duplicate opens quantity edit', (

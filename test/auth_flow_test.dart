@@ -6,6 +6,9 @@ import 'package:swp_mandala_mobile/features/auth/domain/auth_repository.dart';
 import 'package:swp_mandala_mobile/features/auth/domain/login_response.dart';
 import 'package:swp_mandala_mobile/features/auth/presentation/auth_controller.dart';
 import 'package:swp_mandala_mobile/main.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_catalog_failure.dart';
+
+import 'test_helpers.dart';
 
 const _apiUser = AppUser(
   id: 1,
@@ -56,10 +59,17 @@ class _FakeAuthRepository implements AuthRepository {
 
 Future<AuthController> _pumpAuthApp(
   WidgetTester tester,
-  _FakeAuthRepository repository,
-) async {
+  _FakeAuthRepository repository, {
+  TestServiceCatalogRepository? serviceRepository,
+}) async {
   final controller = AuthController(repository);
-  await tester.pumpWidget(MandalaApp(authController: controller));
+  await tester.pumpWidget(
+    MandalaApp(
+      authController: controller,
+      serviceCatalogRepository:
+          serviceRepository ?? TestServiceCatalogRepository(),
+    ),
+  );
   await controller.initialize();
   await tester.pumpAndSettle();
   return controller;
@@ -170,6 +180,38 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    '401 from a service clears auth and returns the pushed form to login',
+    (tester) async {
+      final authRepository = _FakeAuthRepository()
+        ..storedToken = 'stored-token';
+      final serviceRepository = TestServiceCatalogRepository(
+        supplyError: const ServiceCatalogFailure(
+          ServiceCatalogFailureType.unauthorized,
+          'Sesi telah berakhir. Silakan masuk kembali.',
+        ),
+      );
+      final controller = await _pumpAuthApp(
+        tester,
+        authRepository,
+        serviceRepository: serviceRepository,
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('service_2')),
+        380,
+        scrollable: find.byType(Scrollable).at(1),
+      );
+      await tester.tap(find.byKey(const Key('service_2')));
+      await tester.pumpAndSettle();
+
+      expect(authRepository.clearCalls, 1);
+      expect(controller.status, AuthStatus.unauthenticated);
+      expect(find.byKey(const Key('login-submit')), findsOneWidget);
+      expect(find.text('Permintaan Alat Tulis Kantor'), findsNothing);
+    },
+  );
 
   testWidgets('login validates email and password before sending a request', (
     tester,

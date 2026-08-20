@@ -2,14 +2,41 @@ import 'dart:typed_data';
 
 class DamageCategory {
   const DamageCategory({
+    required this.id,
+    required this.code,
     required this.name,
     required this.examples,
-    required this.description,
   });
 
+  final int id;
+  final String code;
   final String name;
   final List<String> examples;
-  final String description;
+
+  factory DamageCategory.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final code = json['kode_kerusakan'];
+    final name = json['name'];
+    if (id is! num ||
+        code is! String ||
+        name is! String ||
+        name.trim().isEmpty) {
+      throw const FormatException('Invalid damage category data.');
+    }
+    final subcategories = json['sub_kategori'];
+    return DamageCategory(
+      id: id.toInt(),
+      code: code.trim(),
+      name: name.trim(),
+      examples: subcategories is List
+          ? subcategories
+                .whereType<String>()
+                .map((item) => item.trim())
+                .where((item) => item.isNotEmpty)
+                .toList(growable: false)
+          : const [],
+    );
+  }
 }
 
 enum DamageAttachmentKind { image, video, unsupported }
