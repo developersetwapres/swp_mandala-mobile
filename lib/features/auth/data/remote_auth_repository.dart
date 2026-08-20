@@ -23,7 +23,7 @@ class RemoteAuthRepository implements AuthRepository {
   }) async {
     try {
       final payload = await _apiClient.post(
-        '/login',
+        'auth/login',
         body: {'email': email, 'password': password},
       );
       final response = LoginResponse.fromJson(payload);
