@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../auth/domain/app_user.dart';
 import '../damage_report/damage_report_page.dart';
 import '../meeting_room/meeting_room_booking_page.dart';
 import '../office_supply/office_supply_request_page.dart';
 import 'home_models.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({required this.user, super.key});
+
+  final AppUser user;
 
   static const List<ServiceItem> _services = [
     ServiceItem(
@@ -92,7 +95,10 @@ class HomePage extends StatelessWidget {
           ),
           slivers: [
             SliverToBoxAdapter(
-              child: _WelcomeHero(onContact: () => _contactHelpdesk(context)),
+              child: _WelcomeHero(
+                user: user,
+                onContact: () => _contactHelpdesk(context),
+              ),
             ),
             SliverToBoxAdapter(
               child: _PageContent(
@@ -143,21 +149,23 @@ class HomePage extends StatelessWidget {
     if (service.name == 'Pemesanan Ruang Rapat') {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (context) => const MeetingRoomBookingPage(),
+          builder: (context) => MeetingRoomBookingPage(user: user),
         ),
       );
       return;
     }
     if (service.name == 'Laporan Kerusakan Sarpras') {
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (context) => const DamageReportPage()),
+        MaterialPageRoute<void>(
+          builder: (context) => DamageReportPage(user: user),
+        ),
       );
       return;
     }
     if (service.name == 'Permintaan ATK') {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (context) => const OfficeSupplyRequestPage(),
+          builder: (context) => OfficeSupplyRequestPage(user: user),
         ),
       );
       return;
@@ -180,8 +188,9 @@ class HomePage extends StatelessWidget {
 }
 
 class _WelcomeHero extends StatelessWidget {
-  const _WelcomeHero({required this.onContact});
+  const _WelcomeHero({required this.user, required this.onContact});
 
+  final AppUser user;
   final VoidCallback onContact;
 
   @override
@@ -217,7 +226,7 @@ class _WelcomeHero extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _ProfileGreeting(),
+                    _ProfileGreeting(user: user),
                     const SizedBox(height: 30),
                     Text(
                       'Ada yang bisa\nkami bantu?',
@@ -262,7 +271,9 @@ class _DecorativeCircle extends StatelessWidget {
 }
 
 class _ProfileGreeting extends StatelessWidget {
-  const _ProfileGreeting();
+  const _ProfileGreeting({required this.user});
+
+  final AppUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +281,7 @@ class _ProfileGreeting extends StatelessWidget {
       children: [
         Semantics(
           image: true,
-          label: 'Avatar Nadia Pratama',
+          label: 'Avatar ${user.name}',
           child: Container(
             width: 52,
             height: 52,
@@ -292,7 +303,7 @@ class _ProfileGreeting extends StatelessWidget {
               ],
             ),
             child: Text(
-              'NP',
+              user.initials,
               style: Theme.of(context).textTheme.titleMedium
                   ?.copyWith(color: Colors.white, letterSpacing: 0.5),
             ),
@@ -311,7 +322,7 @@ class _ProfileGreeting extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Nadia Pratama',
+                user.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge,

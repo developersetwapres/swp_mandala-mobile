@@ -4,7 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/damage_report/damage_report_models.dart';
 import 'package:swp_mandala_mobile/features/damage_report/damage_report_page.dart';
-import 'package:swp_mandala_mobile/main.dart';
+
+import 'test_helpers.dart';
 
 class _FakeMediaPicker implements DamageMediaPicker {
   _FakeMediaPicker([List<List<DamageAttachmentCandidate>>? responses])
@@ -31,12 +32,12 @@ void main() {
   Widget reportApp(_FakeMediaPicker picker) {
     return MaterialApp(
       theme: AppTheme.light,
-      home: DamageReportPage(mediaPicker: picker),
+      home: DamageReportPage(user: testUser, mediaPicker: picker),
     );
   }
 
   testWidgets('damage service opens the report page from home', (tester) async {
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('service_1')),
@@ -47,7 +48,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Laporan Kerusakan Gedung'), findsOneWidget);
-    expect(find.text('Ayu Lestari'), findsOneWidget);
+    expect(find.text('Nadia Pratama'), findsOneWidget);
     expect(find.text('Biro Umum'), findsOneWidget);
   });
 

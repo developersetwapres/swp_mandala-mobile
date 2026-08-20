@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../auth/domain/app_user.dart';
 import 'meeting_room_models.dart';
 import 'room_detail_sheet.dart';
 
 class MeetingRoomBookingPage extends StatefulWidget {
   const MeetingRoomBookingPage({
+    required this.user,
     super.key,
     this.initialDate,
     this.initialStartTime,
     this.initialEndTime,
   });
 
+  final AppUser user;
   final DateTime? initialDate;
   final TimeOfDay? initialStartTime;
   final TimeOfDay? initialEndTime;
@@ -204,7 +207,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                             subtitle: 'Pesanan ini akan diajukan atas namamu.',
                           ),
                           const SizedBox(height: 14),
-                          const _RequesterCard(),
+                          _RequesterCard(user: widget.user),
                           const SizedBox(height: 32),
                           const _SectionIntro(
                             number: '02',
@@ -647,7 +650,9 @@ class _SectionIntro extends StatelessWidget {
 }
 
 class _RequesterCard extends StatelessWidget {
-  const _RequesterCard();
+  const _RequesterCard({required this.user});
+
+  final AppUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -671,7 +676,7 @@ class _RequesterCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              'AL',
+              user.initials,
               style: Theme.of(context).textTheme.titleSmall
                   ?.copyWith(color: Colors.white),
             ),
@@ -681,10 +686,7 @@ class _RequesterCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Ayu Lestari',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(user.name, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -696,7 +698,7 @@ class _RequesterCard extends StatelessWidget {
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
-                        'Biro Umum',
+                        user.unitKerja,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,

@@ -3,13 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/office_supply/office_supply_request_page.dart';
-import 'package:swp_mandala_mobile/main.dart';
+
+import 'test_helpers.dart';
 
 void main() {
   Widget requestApp() {
     return MaterialApp(
       theme: AppTheme.light,
-      home: const OfficeSupplyRequestPage(),
+      home: const OfficeSupplyRequestPage(user: testUser),
     );
   }
 
@@ -39,7 +40,7 @@ void main() {
   }
 
   testWidgets('ATK service opens the request page from home', (tester) async {
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('service_2')),
@@ -50,7 +51,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Permintaan Alat Tulis Kantor'), findsOneWidget);
-    expect(find.text('Ayu Lestari'), findsOneWidget);
+    expect(find.text('Nadia Pratama'), findsOneWidget);
     expect(find.text('Biro Umum'), findsOneWidget);
   });
 

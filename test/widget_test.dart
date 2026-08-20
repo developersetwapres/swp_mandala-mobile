@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:swp_mandala_mobile/main.dart';
+import 'test_helpers.dart';
 
 void main() {
   testWidgets('home page shows the primary overview', (tester) async {
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     expect(find.text('Nadia Pratama'), findsOneWidget);
     expect(find.text('Helpdesk Mandala'), findsOneWidget);
@@ -16,7 +16,7 @@ void main() {
   });
 
   testWidgets('helpdesk action gives immediate feedback', (tester) async {
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     await tester.tap(find.byKey(const Key('contact_helpdesk')));
     await tester.pump();
@@ -27,7 +27,7 @@ void main() {
   testWidgets('hero stays usable on a compact phone', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     expect(find.text('Ada yang bisa\nkami bantu?'), findsOneWidget);
     expect(find.byKey(const Key('contact_helpdesk')), findsOneWidget);
@@ -39,7 +39,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     await tester.scrollUntilVisible(
       find.text('SRP-2026-009'),

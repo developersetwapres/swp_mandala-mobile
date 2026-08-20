@@ -32,6 +32,19 @@
 	<string>Mikrofon digunakan ketika merekam video kerusakan.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Galeri digunakan untuk memilih foto atau video kerusakan.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>src.test</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

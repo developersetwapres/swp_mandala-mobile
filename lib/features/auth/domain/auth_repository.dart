@@ -1,0 +1,15 @@
+import 'app_user.dart';
+import 'login_response.dart';
+
+abstract interface class AuthRepository {
+  Future<LoginResponse> login({
+    required String email,
+    required String password,
+  });
+
+  Future<AppUser> getCurrentUser();
+
+  Future<String?> readStoredToken();
+
+  Future<void> clearSession();
+}

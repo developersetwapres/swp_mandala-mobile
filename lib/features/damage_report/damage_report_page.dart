@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../auth/domain/app_user.dart';
 import 'damage_category_sheet.dart';
 import 'damage_media_source_sheet.dart';
 import 'damage_report_models.dart';
 import 'image_picker_damage_media_picker.dart';
 
 class DamageReportPage extends StatefulWidget {
-  const DamageReportPage({super.key, this.mediaPicker});
+  const DamageReportPage({required this.user, super.key, this.mediaPicker});
 
+  final AppUser user;
   final DamageMediaPicker? mediaPicker;
 
   @override
@@ -146,7 +148,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
                             subtitle: 'Laporan akan dikirim atas namamu.',
                           ),
                           const SizedBox(height: 14),
-                          const _ReporterCard(),
+                          _ReporterCard(user: widget.user),
                           const SizedBox(height: 32),
                           const _SectionIntro(
                             number: '02',
@@ -537,7 +539,9 @@ class _SectionIntro extends StatelessWidget {
 }
 
 class _ReporterCard extends StatelessWidget {
-  const _ReporterCard();
+  const _ReporterCard({required this.user});
+
+  final AppUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -561,7 +565,7 @@ class _ReporterCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              'AL',
+              user.initials,
               style: Theme.of(context).textTheme.titleSmall
                   ?.copyWith(color: Colors.white),
             ),
@@ -571,10 +575,7 @@ class _ReporterCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Ayu Lestari',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(user.name, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -586,7 +587,7 @@ class _ReporterCard extends StatelessWidget {
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
-                        'Biro Umum',
+                        user.unitKerja,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,

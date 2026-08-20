@@ -3,13 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_booking_page.dart';
-import 'package:swp_mandala_mobile/main.dart';
+
+import 'test_helpers.dart';
 
 void main() {
   Widget bookingWithValidSchedule() {
     return MaterialApp(
       theme: AppTheme.light,
       home: MeetingRoomBookingPage(
+        user: testUser,
         initialDate: DateTime.now().add(const Duration(days: 1)),
         initialStartTime: const TimeOfDay(hour: 9, minute: 0),
         initialEndTime: const TimeOfDay(hour: 12, minute: 0),
@@ -20,13 +22,13 @@ void main() {
   testWidgets('meeting room service opens the booking page from home', (
     tester,
   ) async {
-    await tester.pumpWidget(const MandalaApp());
+    await tester.pumpWidget(homeTestApp());
 
     await tester.tap(find.byKey(const Key('service_0')));
     await tester.pumpAndSettle();
 
     expect(find.text('Pemesanan Ruang Rapat'), findsWidgets);
-    expect(find.text('Ayu Lestari'), findsOneWidget);
+    expect(find.text('Nadia Pratama'), findsOneWidget);
     expect(find.text('Biro Umum'), findsOneWidget);
   });
 
@@ -34,7 +36,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light, home: const MeetingRoomBookingPage()),
+      MaterialApp(
+        theme: AppTheme.light,
+        home: const MeetingRoomBookingPage(user: testUser),
+      ),
     );
 
     expect(find.text('Ruang Rapat Buton'), findsNothing);
@@ -144,7 +149,10 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light, home: const MeetingRoomBookingPage()),
+      MaterialApp(
+        theme: AppTheme.light,
+        home: const MeetingRoomBookingPage(user: testUser),
+      ),
     );
 
     expect(find.text('Pemesanan Ruang Rapat'), findsOneWidget);
