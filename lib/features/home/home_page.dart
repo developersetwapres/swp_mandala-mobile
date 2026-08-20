@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../damage_report/damage_report_page.dart';
 import '../meeting_room/meeting_room_booking_page.dart';
+import '../office_supply/office_supply_request_page.dart';
 import 'home_models.dart';
 
 class HomePage extends StatelessWidget {
@@ -150,6 +151,14 @@ class HomePage extends StatelessWidget {
     if (service.name == 'Laporan Kerusakan Sarpras') {
       Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (context) => const DamageReportPage()),
+      );
+      return;
+    }
+    if (service.name == 'Permintaan ATK') {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => const OfficeSupplyRequestPage(),
+        ),
       );
       return;
     }
