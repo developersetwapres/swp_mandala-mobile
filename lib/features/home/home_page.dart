@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../damage_report/damage_report_page.dart';
 import '../meeting_room/meeting_room_booking_page.dart';
 import 'home_models.dart';
 
@@ -143,6 +144,12 @@ class HomePage extends StatelessWidget {
         MaterialPageRoute<void>(
           builder: (context) => const MeetingRoomBookingPage(),
         ),
+      );
+      return;
+    }
+    if (service.name == 'Laporan Kerusakan Sarpras') {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (context) => const DamageReportPage()),
       );
       return;
     }
