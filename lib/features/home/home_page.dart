@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../meeting_room/meeting_room_booking_page.dart';
 import 'home_models.dart';
 
 class HomePage extends StatelessWidget {
@@ -137,6 +138,14 @@ class HomePage extends StatelessWidget {
   }
 
   void _selectService(BuildContext context, ServiceItem service) {
+    if (service.name == 'Pemesanan Ruang Rapat') {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => const MeetingRoomBookingPage(),
+        ),
+      );
+      return;
+    }
     _showMessage(context, '${service.name} dipilih');
   }
 
@@ -484,6 +493,7 @@ class _ServiceCarousel extends StatelessWidget {
             itemBuilder: (context, index) {
               final service = services[index];
               return SizedBox(
+                key: Key('service_$index'),
                 width: itemWidth,
                 child: _ServiceCard(
                   service: service,

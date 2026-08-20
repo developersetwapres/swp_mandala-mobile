@@ -30,6 +30,71 @@ abstract final class AppTheme {
         thickness: 1,
         space: 1,
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.primaryPale,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        hintStyle: _textTheme.bodyMedium?.copyWith(color: AppColors.inkMuted),
+        labelStyle: _textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+        errorStyle: _textTheme.bodySmall?.copyWith(color: AppColors.coral),
+        prefixIconColor: AppColors.primaryStrong,
+        suffixIconColor: AppColors.inkMuted,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: AppColors.primaryStrong,
+            width: 1.5,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.coral),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.coral, width: 1.5),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryStrong,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.line,
+          disabledForegroundColor: AppColors.inkMuted,
+          elevation: 0,
+          minimumSize: const Size(48, 54),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(17),
+          ),
+          textStyle: _textTheme.labelLarge,
+        ),
+      ),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        headerBackgroundColor: AppColors.primarySoft,
+        headerForegroundColor: AppColors.primaryDeep,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: AppColors.surface,
+        hourMinuteColor: AppColors.primarySoft,
+        hourMinuteTextColor: AppColors.primaryDeep,
+        dialHandColor: AppColors.primaryStrong,
+        dialBackgroundColor: AppColors.primaryPale,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.ink,
         contentTextStyle: _textTheme.bodyMedium?.copyWith(color: Colors.white),
