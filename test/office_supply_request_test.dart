@@ -302,7 +302,7 @@ void main() {
           'id': 352,
           'name': 'Binder Clip',
           'satuan': 'Box',
-          'status': 'available',
+          'status': 'normal',
           'requested': 2,
           'approved': 0,
         },
@@ -347,7 +347,7 @@ void main() {
       'id': null,
       'name': 'Label Printer',
       'satuan': 'Roll',
-      'status': 'available',
+      'status': 'normal',
       'requested': 4,
       'approved': 0,
     });

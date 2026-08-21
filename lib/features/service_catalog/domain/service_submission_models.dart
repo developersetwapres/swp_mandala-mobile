@@ -126,7 +126,7 @@ class OfficeSupplySubmissionItem {
     'id': id,
     'name': name,
     'satuan': unit,
-    'status': 'available',
+    'status': 'normal',
     'requested': requested,
     'approved': 0,
   };
