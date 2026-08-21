@@ -194,6 +194,11 @@ class RemoteServiceCatalogRepository implements ServiceCatalogRepository {
       );
     }
     if (error is ApiException) {
+      final message = switch (error.statusCode) {
+        429 => 'Terlalu banyak permintaan. Silakan coba lagi nanti.',
+        >= 500 => 'Terjadi kesalahan pada server. Silakan coba lagi nanti.',
+        _ => error.message,
+      };
       final type = switch (error.statusCode) {
         401 => ServiceSubmissionFailureType.unauthorized,
         403 => ServiceSubmissionFailureType.forbidden,
@@ -203,7 +208,7 @@ class RemoteServiceCatalogRepository implements ServiceCatalogRepository {
       };
       return ServiceSubmissionFailure(
         type: type,
-        message: error.message,
+        message: message,
         fieldErrors: error.fieldErrors,
       );
     }

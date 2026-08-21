@@ -525,7 +525,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
         _phoneTouched = false;
         _submitFieldErrors = const {};
       });
-      _showSubmitMessage(response.message, success: true);
+      _showSubmitMessage(_successMessage(response), success: true);
     } on ServiceSubmissionFailure catch (failure) {
       if (!mounted) return;
       if (failure.type == ServiceSubmissionFailureType.unauthorized) {
@@ -547,6 +547,16 @@ class _DamageReportPageState extends State<DamageReportPage> {
       }
     }
     return null;
+  }
+
+  String _successMessage(ServiceSubmitResponse response) {
+    final details = [
+      if (response.referenceCode != null)
+        'Nomor laporan: ${response.referenceCode}',
+      if (response.status != null) 'Status: ${response.status}',
+    ];
+    if (details.isEmpty) return response.message;
+    return '${response.message} ${details.join('. ')}.';
   }
 
   void _clearFieldErrors(Iterable<String> fields) {

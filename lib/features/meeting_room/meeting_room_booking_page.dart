@@ -375,7 +375,10 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       selectedRoom: _selectedRoom,
       onSelect: _selectRoom,
       onDetail: _showRoomDetail,
-      fieldError: _fieldError('room_code') ?? _fieldError('room'),
+      fieldError:
+          _fieldError('room_code') ??
+          _fieldError('room_name') ??
+          _fieldError('room'),
     );
   }
 
@@ -571,6 +574,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       final response = await widget.repository.submitRoomBooking(
         RoomBookingSubmission(
           roomCode: _selectedRoom!.code,
+          roomName: _selectedRoom!.name,
           date: _apiDate(_selectedDate!),
           startTime: _apiTime(_startTime!),
           endTime: _apiTime(_endTime!),
@@ -590,7 +594,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       );
       if (!mounted) return;
       _resetAfterSuccess();
-      _showSubmitMessage(response.message, success: true);
+      _showSubmitMessage(_successMessage(response), success: true);
     } on ServiceSubmissionFailure catch (failure) {
       if (!mounted) return;
       if (failure.type == ServiceSubmissionFailureType.unauthorized) {
@@ -622,6 +626,16 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   }
 
   String? _fieldError(String field) => _submitFieldErrors[field]?.firstOrNull;
+
+  String _successMessage(ServiceSubmitResponse response) {
+    final details = [
+      if (response.referenceCode != null)
+        'Nomor booking: ${response.referenceCode}',
+      if (response.status != null) 'Status: ${response.status}',
+    ];
+    if (details.isEmpty) return response.message;
+    return '${response.message} ${details.join('. ')}.';
+  }
 
   void _clearFieldErrors(Iterable<String> fields) {
     if (_submitFieldErrors.isEmpty) return;

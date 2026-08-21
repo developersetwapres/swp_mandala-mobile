@@ -497,7 +497,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
         _phoneTouched = false;
         _submitFieldErrors = const {};
       });
-      _showSubmitMessage(response.message, success: true);
+      _showSubmitMessage(_successMessage(response), success: true);
     } on ServiceSubmissionFailure catch (failure) {
       if (!mounted) return;
       if (failure.type == ServiceSubmissionFailureType.unauthorized) {
@@ -513,6 +513,16 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
   }
 
   String? _fieldError(String field) => _submitFieldErrors[field]?.firstOrNull;
+
+  String _successMessage(ServiceSubmitResponse response) {
+    final details = [
+      if (response.referenceCode != null)
+        'Nomor permintaan: ${response.referenceCode}',
+      if (response.status != null) 'Status: ${response.status}',
+    ];
+    if (details.isEmpty) return response.message;
+    return '${response.message} ${details.join('. ')}.';
+  }
 
   void _clearFieldErrors(Iterable<String> fields) {
     if (_submitFieldErrors.isEmpty) return;

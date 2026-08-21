@@ -24,17 +24,21 @@ class DamageCategory {
       throw const FormatException('Invalid damage category data.');
     }
     final subcategories = json['sub_kategori'];
+    final examples = switch (subcategories) {
+      String value when value.trim().isNotEmpty => [value.trim()],
+      List value =>
+        value
+            .whereType<String>()
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false),
+      _ => const <String>[],
+    };
     return DamageCategory(
       id: id.toInt(),
       code: code.trim(),
       name: name.trim(),
-      examples: subcategories is List
-          ? subcategories
-                .whereType<String>()
-                .map((item) => item.trim())
-                .where((item) => item.isNotEmpty)
-                .toList(growable: false)
-          : const [],
+      examples: examples,
     );
   }
 }

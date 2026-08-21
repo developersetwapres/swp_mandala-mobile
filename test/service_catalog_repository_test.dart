@@ -227,6 +227,7 @@ void main() {
       expect(request.headers['Content-Type'], contains('application/json'));
       expect(jsonDecode(request.body), {
         'room_code': 'RPT-2V4N9',
+        'room_name': 'Ruang Rapat Utama',
         'date': '2026-08-20',
         'startTime': '08:00',
         'endTime': '10:00',
@@ -251,6 +252,7 @@ void main() {
     final response = await repository.submitRoomBooking(
       const RoomBookingSubmission(
         roomCode: 'RPT-2V4N9',
+        roomName: 'Ruang Rapat Utama',
         date: '2026-08-20',
         startTime: '08:00',
         endTime: '10:00',
@@ -280,7 +282,7 @@ void main() {
           'id': 353,
           'name': 'Amplop Coklat A3',
           'satuan': 'Buah',
-          'status': 'requested',
+          'status': 'available',
           'requested': 3,
           'approved': 0,
         },
@@ -288,7 +290,7 @@ void main() {
           'id': null,
           'name': 'Label Printer',
           'satuan': 'Roll',
-          'status': 'requested',
+          'status': 'available',
           'requested': 5,
           'approved': 0,
         },
@@ -450,7 +452,10 @@ void main() {
     final server = await failureFor(500, 'Terjadi kesalahan khusus backend.');
 
     expect(business.message, 'Pengajuan tidak diizinkan.');
-    expect(server.message, 'Terjadi kesalahan khusus backend.');
+    expect(
+      server.message,
+      'Terjadi kesalahan pada server. Silakan coba lagi nanti.',
+    );
   });
 
   test(

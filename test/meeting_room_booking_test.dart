@@ -253,6 +253,7 @@ void main() {
     expect(repository.roomSubmitCalls, 1);
     expect(repository.submittedRoom?.toJson(), {
       'room_code': 'RPT-BUTON',
+      'room_name': 'Ruang Rapat Buton',
       'date': isA<String>(),
       'startTime': '09:00',
       'endTime': '12:00',

@@ -1,19 +1,62 @@
 import '../../damage_report/damage_report_models.dart';
 
 class ServiceSubmitResponse {
-  const ServiceSubmitResponse({required this.message});
+  const ServiceSubmitResponse({
+    required this.message,
+    this.referenceCode,
+    this.status,
+    this.picture = const [],
+    this.daftarKebutuhan = const [],
+    this.tanggalPenggunaan,
+    this.jamMulai,
+    this.jamSelesai,
+  });
 
   final String message;
+  final String? referenceCode;
+  final String? status;
+  final List<Object?> picture;
+  final List<Object?> daftarKebutuhan;
+  final String? tanggalPenggunaan;
+  final String? jamMulai;
+  final String? jamSelesai;
 
   factory ServiceSubmitResponse.fromJson(
     Map<String, dynamic> json, {
     required String fallbackMessage,
   }) {
     final message = json['message'];
+    final data = json['data'];
+    final responseData = data is Map<String, dynamic> ? data : const {};
+    final reportCode = responseData['kode_pelaporan'];
+    final bookingCode = responseData['kode_booking'];
     return ServiceSubmitResponse(
       message: message is String && message.trim().isNotEmpty
           ? message.trim()
           : fallbackMessage,
+      referenceCode: reportCode is String
+          ? reportCode
+          : bookingCode is String
+          ? bookingCode
+          : null,
+      status: responseData['status'] is String
+          ? responseData['status'] as String
+          : null,
+      picture: responseData['picture'] is List
+          ? List<Object?>.unmodifiable(responseData['picture'] as List)
+          : const [],
+      daftarKebutuhan: responseData['daftar_kebutuhan'] is List
+          ? List<Object?>.unmodifiable(responseData['daftar_kebutuhan'] as List)
+          : const [],
+      tanggalPenggunaan: responseData['tanggal_penggunaan'] is String
+          ? responseData['tanggal_penggunaan'] as String
+          : null,
+      jamMulai: responseData['jam_mulai'] is String
+          ? responseData['jam_mulai'] as String
+          : null,
+      jamSelesai: responseData['jam_selesai'] is String
+          ? responseData['jam_selesai'] as String
+          : null,
     );
   }
 }
@@ -21,6 +64,7 @@ class ServiceSubmitResponse {
 class RoomBookingSubmission {
   const RoomBookingSubmission({
     required this.roomCode,
+    this.roomName,
     required this.date,
     required this.startTime,
     required this.endTime,
@@ -35,6 +79,7 @@ class RoomBookingSubmission {
   });
 
   final String roomCode;
+  final String? roomName;
   final String date;
   final String startTime;
   final String endTime;
@@ -49,6 +94,7 @@ class RoomBookingSubmission {
 
   Map<String, dynamic> toJson() => {
     'room_code': roomCode,
+    'room_name': roomName,
     'date': date,
     'startTime': startTime,
     'endTime': endTime,
@@ -80,7 +126,7 @@ class OfficeSupplySubmissionItem {
     'id': id,
     'name': name,
     'satuan': unit,
-    'status': 'requested',
+    'status': 'available',
     'requested': requested,
     'approved': 0,
   };
