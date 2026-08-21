@@ -9,6 +9,8 @@ import 'features/auth/data/remote_auth_repository.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/auth/presentation/auth_scope.dart';
+import 'features/history/data/remote_history_repository.dart';
+import 'features/history/domain/history_repository.dart';
 import 'features/service_catalog/data/remote_service_catalog_repository.dart';
 import 'features/service_catalog/domain/service_catalog_repository.dart';
 
@@ -28,11 +30,13 @@ void main() {
   final serviceCatalogRepository = RemoteServiceCatalogRepository(
     apiClient: apiClient,
   );
+  final historyRepository = RemoteHistoryRepository(apiClient: apiClient);
 
   runApp(
     MandalaApp(
       authController: authController,
       serviceCatalogRepository: serviceCatalogRepository,
+      historyRepository: historyRepository,
     ),
   );
   authController.initialize();
@@ -42,11 +46,13 @@ class MandalaApp extends StatelessWidget {
   const MandalaApp({
     required this.authController,
     required this.serviceCatalogRepository,
+    required this.historyRepository,
     super.key,
   });
 
   final AuthController authController;
   final ServiceCatalogRepository serviceCatalogRepository;
+  final HistoryRepository historyRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +68,7 @@ class MandalaApp extends StatelessWidget {
         home: AuthGate(
           controller: authController,
           serviceCatalogRepository: serviceCatalogRepository,
+          historyRepository: historyRepository,
         ),
       ),
     );

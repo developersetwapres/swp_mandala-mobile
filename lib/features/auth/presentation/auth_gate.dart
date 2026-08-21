@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../home/home_page.dart';
+import '../../history/domain/history_repository.dart';
 import '../../service_catalog/domain/service_catalog_repository.dart';
 import 'auth_controller.dart';
 import 'login_page.dart';
@@ -10,11 +11,13 @@ class AuthGate extends StatelessWidget {
   const AuthGate({
     required this.controller,
     required this.serviceCatalogRepository,
+    required this.historyRepository,
     super.key,
   });
 
   final AuthController controller;
   final ServiceCatalogRepository serviceCatalogRepository;
+  final HistoryRepository historyRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +36,7 @@ class AuthGate extends StatelessWidget {
             key: const ValueKey('home-page'),
             user: controller.currentUser!,
             serviceCatalogRepository: serviceCatalogRepository,
+            historyRepository: historyRepository,
           ),
           AuthStatus.sessionCheckFailed => _SessionErrorPage(
             key: const ValueKey('session-error'),

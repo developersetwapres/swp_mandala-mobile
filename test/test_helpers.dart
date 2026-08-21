@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/auth/domain/app_user.dart';
 import 'package:swp_mandala_mobile/features/home/home_page.dart';
+import 'package:swp_mandala_mobile/features/history/domain/history_entry.dart';
+import 'package:swp_mandala_mobile/features/history/domain/history_repository.dart';
 import 'package:swp_mandala_mobile/features/damage_report/damage_report_models.dart';
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_models.dart';
 import 'package:swp_mandala_mobile/features/office_supply/office_supply_models.dart';
@@ -16,6 +18,85 @@ const testUser = AppUser(
   name: 'Nadia Pratama',
   unitKerja: 'Biro Umum',
 );
+
+class TestHistoryRepository implements HistoryRepository {
+  TestHistoryRepository({
+    List<HistoryEntry>? entries,
+    this.error,
+    this.response,
+  }) : entries = entries ?? defaultHistory;
+
+  final List<HistoryEntry> entries;
+  final Object? error;
+  final Future<List<HistoryEntry>>? response;
+  int calls = 0;
+
+  static final defaultHistory = [
+    HistoryEntry.fromJson({
+      'id': 'booking',
+      'type': 'Ruangan Rapat',
+      'is_read': 0,
+      'code': 'RRT-0821-ABC',
+      'title': 'Ruang Rapat Buton',
+      'ruangans': {
+        'id': 2,
+        'nama_ruangan': 'Ruang Rapat Buton',
+        'lokasi': 'Gedung 2, Lantai 3',
+      },
+      'info': 'Koordinasi program kerja',
+      'subtitle': '21 Agustus 2026',
+      'created_at': '2026-08-21T08:58:43.000000Z',
+      'status': 'booked',
+      'time': '09:00 - 11:00',
+    }),
+    HistoryEntry.fromJson({
+      'id': 'supplies',
+      'type': 'ATK',
+      'is_read': 1,
+      'code': 'ATK-0821-VPV',
+      'title': '2 item',
+      'info': 'Amplop Coklat 5 Buah, Pulpen 2 Pcs',
+      'daftarkebutuhan': [
+        {
+          'id': 353,
+          'name': 'Amplop Coklat',
+          'satuan': 'Buah',
+          'status': 'normal',
+          'requested': 5,
+          'approved': 0,
+        },
+      ],
+      'created_at': '2026-08-20T04:30:00.000000Z',
+      'status': 'pending',
+    }),
+    HistoryEntry.fromJson({
+      'id': 'damage',
+      'type': 'Kerusakan',
+      'is_read': 1,
+      'code': 'KRS-0820-ZZZ',
+      'title': 'AC Ruang Rapat',
+      'info': 'Gedung Sekretariat I Lantai 4',
+      'deskripsi': 'AC tidak mengeluarkan udara dingin.',
+      'kategori': {
+        'id': 4,
+        'kode_kerusakan': 'KRN-Q9HCF',
+        'name': 'Tata Udara',
+        'sub_kategori': ['AC', 'Kipas Angin'],
+      },
+      'picture': ['https://example.test/ac.jpg'],
+      'created_at': 'malformed optional date',
+      'status': 'completed',
+    }),
+  ];
+
+  @override
+  Future<List<HistoryEntry>> getHistory() async {
+    calls += 1;
+    if (error case final value?) throw value;
+    if (response case final value?) return value;
+    return entries;
+  }
+}
 
 class TestServiceCatalogRepository implements ServiceCatalogRepository {
   TestServiceCatalogRepository({
@@ -223,9 +304,13 @@ Widget testApp({required Widget home}) {
   );
 }
 
-Widget homeTestApp({TestServiceCatalogRepository? repository}) => testApp(
+Widget homeTestApp({
+  TestServiceCatalogRepository? repository,
+  TestHistoryRepository? historyRepository,
+}) => testApp(
   home: HomePage(
     user: testUser,
     serviceCatalogRepository: repository ?? TestServiceCatalogRepository(),
+    historyRepository: historyRepository ?? TestHistoryRepository(),
   ),
 );

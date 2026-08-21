@@ -5,6 +5,7 @@ import 'package:swp_mandala_mobile/features/auth/domain/auth_failure.dart';
 import 'package:swp_mandala_mobile/features/auth/domain/auth_repository.dart';
 import 'package:swp_mandala_mobile/features/auth/domain/login_response.dart';
 import 'package:swp_mandala_mobile/features/auth/presentation/auth_controller.dart';
+import 'package:swp_mandala_mobile/features/history/domain/history_failure.dart';
 import 'package:swp_mandala_mobile/main.dart';
 import 'package:swp_mandala_mobile/features/service_catalog/domain/service_catalog_failure.dart';
 
@@ -61,6 +62,7 @@ Future<AuthController> _pumpAuthApp(
   WidgetTester tester,
   _FakeAuthRepository repository, {
   TestServiceCatalogRepository? serviceRepository,
+  TestHistoryRepository? historyRepository,
 }) async {
   final controller = AuthController(repository);
   await tester.pumpWidget(
@@ -68,6 +70,7 @@ Future<AuthController> _pumpAuthApp(
       authController: controller,
       serviceCatalogRepository:
           serviceRepository ?? TestServiceCatalogRepository(),
+      historyRepository: historyRepository ?? TestHistoryRepository(),
     ),
   );
   await controller.initialize();
@@ -212,6 +215,35 @@ void main() {
       expect(find.text('Permintaan Alat Tulis Kantor'), findsNothing);
     },
   );
+
+  testWidgets('401 from History clears auth and returns to login', (
+    tester,
+  ) async {
+    final authRepository = _FakeAuthRepository()..storedToken = 'stored-token';
+    final historyRepository = TestHistoryRepository(
+      error: const HistoryFailure(
+        HistoryFailureType.unauthorized,
+        'Unauthenticated.',
+      ),
+    );
+    final controller = await _pumpAuthApp(
+      tester,
+      authRepository,
+      historyRepository: historyRepository,
+    );
+
+    await tester.tap(find.byKey(const Key('nav_history')));
+    await tester.pumpAndSettle();
+
+    expect(historyRepository.calls, 1);
+    expect(authRepository.clearCalls, 1);
+    expect(controller.status, AuthStatus.unauthenticated);
+    expect(find.byKey(const Key('login-submit')), findsOneWidget);
+    expect(
+      find.text('Pantau perjalanan seluruh pengajuan layananmu.'),
+      findsNothing,
+    );
+  });
 
   testWidgets('login validates email and password before sending a request', (
     tester,

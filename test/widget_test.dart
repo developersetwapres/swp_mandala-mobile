@@ -24,28 +24,29 @@ void main() {
     expect(find.text('Menghubungkan ke Helpdesk Mandala…'), findsOneWidget);
   });
 
-  testWidgets(
-    'primary shell shows styled navigation without placeholder pages',
-    (tester) async {
-      await tester.pumpWidget(homeTestApp());
+  testWidgets('primary shell opens History and returns to Beranda', (
+    tester,
+  ) async {
+    await tester.pumpWidget(homeTestApp());
 
-      expect(
-        find.byKey(const Key('primary_bottom_navigation')),
-        findsOneWidget,
-      );
-      expect(find.text('Beranda'), findsOneWidget);
-      expect(find.text('History'), findsOneWidget);
-      expect(find.text('Profil'), findsOneWidget);
+    expect(find.byKey(const Key('primary_bottom_navigation')), findsOneWidget);
+    expect(find.text('Beranda'), findsOneWidget);
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Profil'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('nav_history')));
-      await tester.pump();
-      expect(
-        find.text('History akan tersedia pada tahap berikutnya.'),
-        findsOneWidget,
-      );
-      expect(find.text('Layanan'), findsOneWidget);
-    },
-  );
+    await tester.tap(find.byKey(const Key('nav_history')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Pantau perjalanan seluruh pengajuan layananmu.'),
+      findsOneWidget,
+    );
+    expect(find.text('ATK-0821-VPV'), findsOneWidget);
+    expect(find.text('Layanan'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('nav_home')));
+    await tester.pumpAndSettle();
+    expect(find.text('Layanan'), findsOneWidget);
+  });
 
   testWidgets('hero stays usable on a compact phone', (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
