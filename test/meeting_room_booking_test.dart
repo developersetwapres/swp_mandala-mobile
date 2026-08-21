@@ -1,24 +1,47 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_models.dart';
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_booking_page.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_submission_failure.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_submission_models.dart';
 
 import 'test_helpers.dart';
 
 void main() {
-  Widget bookingWithValidSchedule() {
+  Widget bookingWithValidSchedule({TestServiceCatalogRepository? repository}) {
     return MaterialApp(
       theme: AppTheme.light,
       home: MeetingRoomBookingPage(
         user: testUser,
-        repository: TestServiceCatalogRepository(),
+        repository: repository ?? TestServiceCatalogRepository(),
         initialDate: DateTime.now().add(const Duration(days: 1)),
         initialStartTime: const TimeOfDay(hour: 9, minute: 0),
         initialEndTime: const TimeOfDay(hour: 12, minute: 0),
       ),
     );
+  }
+
+  Future<void> fillValidBooking(WidgetTester tester) async {
+    await tester.ensureVisible(find.byKey(const Key('room_buton')));
+    await tester.tap(find.byKey(const Key('room_buton')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('meeting_type_internal')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('meeting_type_internal')));
+    await tester.enterText(find.byKey(const Key('participant_field')), '8');
+    await tester.enterText(
+      find.byKey(const Key('activity_field')),
+      'Koordinasi program kerja',
+    );
+    await tester.enterText(
+      find.byKey(const Key('phone_field')),
+      '081234567890',
+    );
+    await tester.pump();
   }
 
   testWidgets('meeting room service opens the booking page from home', (
@@ -208,11 +231,8 @@ void main() {
   testWidgets('submit activates only after mandatory fields are valid', (
     tester,
   ) async {
-    await tester.pumpWidget(bookingWithValidSchedule());
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.byKey(const Key('room_buton')));
-    await tester.tap(find.byKey(const Key('room_buton')));
+    final repository = TestServiceCatalogRepository();
+    await tester.pumpWidget(bookingWithValidSchedule(repository: repository));
     await tester.pumpAndSettle();
 
     ElevatedButton submitButton() =>
@@ -220,19 +240,7 @@ void main() {
 
     expect(submitButton().onPressed, isNull);
 
-    await tester.ensureVisible(find.byKey(const Key('meeting_type_internal')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('meeting_type_internal')));
-    await tester.enterText(find.byKey(const Key('participant_field')), '8');
-    await tester.enterText(
-      find.byKey(const Key('activity_field')),
-      'Koordinasi program kerja',
-    );
-    await tester.enterText(
-      find.byKey(const Key('phone_field')),
-      '081234567890',
-    );
-    await tester.pump();
+    await fillValidBooking(tester);
 
     expect(submitButton().onPressed, isNotNull);
 
@@ -242,6 +250,75 @@ void main() {
       find.text('Pemesanan Ruang Rapat Buton berhasil diajukan.'),
       findsOneWidget,
     );
+    expect(repository.roomSubmitCalls, 1);
+    expect(repository.submittedRoom?.toJson(), {
+      'room_code': 'RPT-BUTON',
+      'date': isA<String>(),
+      'startTime': '09:00',
+      'endTime': '12:00',
+      'purpose': 'Koordinasi program kerja',
+      'jumlahPeserta': '8',
+      'contact': '081234567890',
+      'jenisRapat': 'internal',
+      'needItSupport': false,
+      'itSupportDetail': null,
+      'isHybrid': false,
+      'hybridDetail': null,
+    });
+  });
+
+  testWidgets('backend field error stays attached to the matching room field', (
+    tester,
+  ) async {
+    final repository = TestServiceCatalogRepository(
+      roomSubmitError: const ServiceSubmissionFailure(
+        type: ServiceSubmissionFailureType.validation,
+        message: 'The given data was invalid.',
+        fieldErrors: {
+          'purpose': ['Kegiatan sudah melebihi 255 karakter.'],
+        },
+      ),
+    );
+    await tester.pumpWidget(bookingWithValidSchedule(repository: repository));
+    await tester.pumpAndSettle();
+    await fillValidBooking(tester);
+
+    await tester.tap(find.byKey(const Key('submit_booking')));
+    await tester.pump();
+
+    expect(find.text('Kegiatan sudah melebihi 255 karakter.'), findsWidgets);
+    expect(find.text('The given data was invalid.'), findsNothing);
+  });
+
+  testWidgets('room request cannot be submitted twice while loading', (
+    tester,
+  ) async {
+    final completer = Completer<ServiceSubmitResponse>();
+    final repository = TestServiceCatalogRepository(
+      roomSubmitFuture: completer.future,
+    );
+    await tester.pumpWidget(bookingWithValidSchedule(repository: repository));
+    await tester.pumpAndSettle();
+    await fillValidBooking(tester);
+
+    await tester.tap(find.byKey(const Key('submit_booking')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('submit_booking')));
+    await tester.pump();
+
+    expect(repository.roomSubmitCalls, 1);
+    expect(
+      tester
+          .widget<ElevatedButton>(find.byKey(const Key('submit_booking')))
+          .onPressed,
+      isNull,
+    );
+
+    completer.complete(
+      const ServiceSubmitResponse(message: 'Berhasil dari backend.'),
+    );
+    await tester.pump();
+    expect(find.text('Berhasil dari backend.'), findsOneWidget);
   });
 
   testWidgets('booking header and schedule fit a compact phone', (

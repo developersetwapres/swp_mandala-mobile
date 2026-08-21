@@ -9,12 +9,12 @@ import 'package:swp_mandala_mobile/features/service_catalog/domain/service_catal
 import 'test_helpers.dart';
 
 void main() {
-  Widget requestApp() {
+  Widget requestApp({TestServiceCatalogRepository? repository}) {
     return MaterialApp(
       theme: AppTheme.light,
       home: OfficeSupplyRequestPage(
         user: testUser,
-        repository: TestServiceCatalogRepository(),
+        repository: repository ?? TestServiceCatalogRepository(),
       ),
     );
   }
@@ -250,7 +250,20 @@ void main() {
   testWidgets('submit requires at least one item and a valid phone number', (
     tester,
   ) async {
-    await tester.pumpWidget(requestApp());
+    final repository = TestServiceCatalogRepository(
+      supplies: const [
+        OfficeSupply(
+          id: '352',
+          name: 'Binder Clip',
+          unit: 'Box',
+          icon: Icons.inventory_2_outlined,
+          description: 'PENJEPIT',
+          categoryId: 3,
+          categoryName: 'PENJEPIT',
+        ),
+      ],
+    );
+    await tester.pumpWidget(requestApp(repository: repository));
 
     ElevatedButton submitButton() => tester.widget<ElevatedButton>(
       find.byKey(const Key('submit_supply_request')),
@@ -261,7 +274,7 @@ void main() {
     await addMasterItem(
       tester,
       query: 'Binder Clip',
-      supplyId: 'binder_clip',
+      supplyId: '352',
       quantity: '2',
     );
     expect(submitButton().onPressed, isNull);
@@ -269,6 +282,10 @@ void main() {
     await tester.enterText(
       find.byKey(const Key('supply_phone_field')),
       '081234567890',
+    );
+    await tester.enterText(
+      find.byKey(const Key('supply_note_field')),
+      'Kebutuhan operasional unit kerja',
     );
     await tester.pump();
     expect(submitButton().onPressed, isNotNull);
@@ -278,6 +295,62 @@ void main() {
     await tester.tap(find.byKey(const Key('submit_supply_request')));
     await tester.pumpAndSettle();
     expect(find.text('Permintaan ATK berhasil diajukan.'), findsOneWidget);
+    expect(repository.supplySubmitCalls, 1);
+    expect(repository.submittedSupply?.toJson(), {
+      'items': [
+        {
+          'id': 352,
+          'name': 'Binder Clip',
+          'satuan': 'Box',
+          'status': 'requested',
+          'requested': 2,
+          'approved': 0,
+        },
+      ],
+      'justification': 'Kebutuhan operasional unit kerja',
+      'contact': '081234567890',
+    });
+  });
+
+  testWidgets('Lain-Lain submits a null ID without inventing a master ID', (
+    tester,
+  ) async {
+    final repository = TestServiceCatalogRepository();
+    await tester.pumpWidget(requestApp(repository: repository));
+    await openSelector(tester);
+    await tester.tap(find.byKey(const Key('supply_other')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('custom_supply_name')),
+      'Label Printer',
+    );
+    await tester.enterText(find.byKey(const Key('supply_quantity_field')), '4');
+    await tester.enterText(find.byKey(const Key('custom_supply_unit')), 'Roll');
+    await tester.tap(find.byKey(const Key('save_supply_item')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('supply_note_field')),
+      'Kebutuhan label dokumen',
+    );
+    await tester.enterText(
+      find.byKey(const Key('supply_phone_field')),
+      '081234567890',
+    );
+    await tester.pump();
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('submit_supply_request')));
+    await tester.pump();
+
+    expect(repository.submittedSupply?.items.single.toJson(), {
+      'id': null,
+      'name': 'Label Printer',
+      'satuan': 'Roll',
+      'status': 'requested',
+      'requested': 4,
+      'approved': 0,
+    });
   });
 
   testWidgets('request header and basket fit a compact phone', (tester) async {

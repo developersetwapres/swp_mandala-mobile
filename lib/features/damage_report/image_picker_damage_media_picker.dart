@@ -65,13 +65,14 @@ class ImagePickerDamageMediaPicker implements DamageMediaPicker {
       sizeBytes: size,
       kind: kind,
       previewBytes: previewBytes,
+      path: file.path,
     );
   }
 
   DamageAttachmentKind _kindFromName(String name) {
     final extension = name.split('.').last.toLowerCase();
-    const imageExtensions = {'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'};
-    const videoExtensions = {'mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm'};
+    const imageExtensions = {'jpg', 'jpeg', 'png', 'heic'};
+    const videoExtensions = {'mp4', 'mov', 'avi', 'mkv', 'webm'};
 
     if (imageExtensions.contains(extension)) return DamageAttachmentKind.image;
     if (videoExtensions.contains(extension)) return DamageAttachmentKind.video;

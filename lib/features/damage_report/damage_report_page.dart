@@ -6,6 +6,8 @@ import '../auth/domain/app_user.dart';
 import '../auth/presentation/auth_scope.dart';
 import '../service_catalog/domain/service_catalog_failure.dart';
 import '../service_catalog/domain/service_catalog_repository.dart';
+import '../service_catalog/domain/service_submission_failure.dart';
+import '../service_catalog/domain/service_submission_models.dart';
 import 'damage_category_sheet.dart';
 import 'damage_media_source_sheet.dart';
 import 'damage_report_models.dart';
@@ -29,7 +31,8 @@ class DamageReportPage extends StatefulWidget {
 
 class _DamageReportPageState extends State<DamageReportPage> {
   static const int _maximumFiles = 2;
-  static const int _maximumFileSize = 20 * 1024 * 1024;
+  static const int _maximumImageSize = 5 * 1024 * 1024;
+  static const int _maximumVideoSize = 20 * 1024 * 1024;
 
   final _locationController = TextEditingController();
   final _itemController = TextEditingController();
@@ -54,6 +57,8 @@ class _DamageReportPageState extends State<DamageReportPage> {
   List<DamageCategory> _categories = const [];
   bool _isLoadingCategories = true;
   String? _categoryError;
+  bool _isSubmitting = false;
+  Map<String, List<String>> _submitFieldErrors = const {};
 
   @override
   void initState() {
@@ -84,7 +89,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
 
   bool get _isPhoneValid {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 9;
+    return digits.length >= 9 && _phoneController.text.length <= 15;
   }
 
   bool get _canSubmit {
@@ -92,6 +97,10 @@ class _DamageReportPageState extends State<DamageReportPage> {
         _itemController.text.trim().isNotEmpty &&
         _selectedCategory != null &&
         _descriptionController.text.trim().isNotEmpty &&
+        _locationController.text.trim().length <= 255 &&
+        _itemController.text.trim().length <= 255 &&
+        _descriptionController.text.trim().length <= 255 &&
+        _attachments.isNotEmpty &&
         _isPhoneValid;
   }
 
@@ -106,6 +115,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
     if (_descriptionController.text.trim().isEmpty) {
       return 'Ceritakan kondisi kerusakan';
     }
+    if (_attachments.isEmpty) return 'Tambahkan dokumentasi kerusakan';
     if (!_isPhoneValid) return 'Lengkapi nomor HP yang dapat dihubungi';
     return 'Laporan siap dikirim';
   }
@@ -160,17 +170,24 @@ class _DamageReportPageState extends State<DamageReportPage> {
                             locationFocus: _locationFocus,
                             itemFocus: _itemFocus,
                             locationError:
-                                _locationTouched &&
-                                    _locationController.text.trim().isEmpty
-                                ? 'Lokasinya perlu diisi agar mudah ditemukan.'
-                                : null,
+                                _fieldError('location') ??
+                                (_locationTouched &&
+                                        _locationController.text.trim().isEmpty
+                                    ? 'Lokasinya perlu diisi agar mudah ditemukan.'
+                                    : null),
                             itemError:
-                                _itemTouched &&
-                                    _itemController.text.trim().isEmpty
-                                ? 'Tuliskan item yang mengalami kerusakan.'
-                                : null,
+                                _fieldError('damageType') ??
+                                (_itemTouched &&
+                                        _itemController.text.trim().isEmpty
+                                    ? 'Tuliskan item yang mengalami kerusakan.'
+                                    : null),
+                            categoryError: _fieldError('kategori'),
                             category: _selectedCategory,
-                            onChanged: (_) => setState(() {}),
+                            onLocationChanged: (_) =>
+                                setState(() => _clearFieldErrors(['location'])),
+                            onItemChanged: (_) => setState(
+                              () => _clearFieldErrors(['damageType']),
+                            ),
                             onChooseCategory: _showCategoryPicker,
                           ),
                           if (_isLoadingCategories ||
@@ -202,11 +219,16 @@ class _DamageReportPageState extends State<DamageReportPage> {
                             controller: _descriptionController,
                             focusNode: _descriptionFocus,
                             error:
-                                _descriptionTouched &&
-                                    _descriptionController.text.trim().isEmpty
-                                ? 'Tambahkan sedikit keterangan tentang kerusakan.'
-                                : null,
-                            onChanged: (_) => setState(() {}),
+                                _fieldError('description') ??
+                                (_descriptionTouched &&
+                                        _descriptionController.text
+                                            .trim()
+                                            .isEmpty
+                                    ? 'Tambahkan sedikit keterangan tentang kerusakan.'
+                                    : null),
+                            onChanged: (_) => setState(
+                              () => _clearFieldErrors(['description']),
+                            ),
                           ),
                           const SizedBox(height: 32),
                           const _SectionIntro(
@@ -217,7 +239,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
                           const SizedBox(height: 14),
                           _AttachmentPanel(
                             attachments: _attachments,
-                            error: _attachmentError,
+                            error: _attachmentError ?? _fieldError('photos'),
                             isPicking: _isPickingMedia,
                             onAdd: _showMediaSourcePicker,
                             onRemove: _removeAttachment,
@@ -232,10 +254,13 @@ class _DamageReportPageState extends State<DamageReportPage> {
                           _PhonePanel(
                             controller: _phoneController,
                             focusNode: _phoneFocus,
-                            error: _phoneTouched && !_isPhoneValid
-                                ? 'Masukkan nomor HP aktif, minimal 9 digit.'
-                                : null,
-                            onChanged: (_) => setState(() {}),
+                            error:
+                                _fieldError('contact') ??
+                                (_phoneTouched && !_isPhoneValid
+                                    ? 'Masukkan nomor HP aktif, 9–15 karakter.'
+                                    : null),
+                            onChanged: (_) =>
+                                setState(() => _clearFieldErrors(['contact'])),
                           ),
                         ],
                       ),
@@ -247,8 +272,9 @@ class _DamageReportPageState extends State<DamageReportPage> {
           ],
         ),
         bottomNavigationBar: _SubmitBar(
-          enabled: _canSubmit,
-          hint: _submitHint,
+          enabled: _canSubmit && !_isSubmitting,
+          loading: _isSubmitting,
+          hint: _isSubmitting ? 'Mengirim laporan…' : _submitHint,
           onSubmit: _submit,
         ),
       ),
@@ -301,7 +327,10 @@ class _DamageReportPageState extends State<DamageReportPage> {
         categories: _categories,
         selectedCategory: _selectedCategory,
         onSelected: (category) {
-          setState(() => _selectedCategory = category);
+          setState(() {
+            _selectedCategory = category;
+            _clearFieldErrors(['kategori']);
+          });
           Navigator.pop(sheetContext);
         },
       ),
@@ -426,9 +455,13 @@ class _DamageReportPageState extends State<DamageReportPage> {
             'Format ${candidate.name} belum didukung. Pilih gambar atau video umum.';
         continue;
       }
-      if (candidate.sizeBytes > _maximumFileSize) {
-        validationMessage =
-            '${candidate.name} lebih dari 20 MB. Pilih file yang lebih kecil, ya.';
+      final maximumSize = candidate.kind == DamageAttachmentKind.video
+          ? _maximumVideoSize
+          : _maximumImageSize;
+      if (candidate.sizeBytes > maximumSize) {
+        validationMessage = candidate.kind == DamageAttachmentKind.video
+            ? '${candidate.name} lebih dari 20 MB. Pilih file yang lebih kecil, ya.'
+            : '${candidate.name} lebih dari 5 MB. Pilih foto yang lebih kecil, ya.';
         continue;
       }
 
@@ -439,6 +472,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
           sizeBytes: candidate.sizeBytes,
           kind: candidate.kind,
           previewBytes: candidate.previewBytes,
+          path: candidate.path,
         ),
       );
     }
@@ -446,6 +480,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
     setState(() {
       _attachments.addAll(accepted);
       _attachmentError = validationMessage;
+      _clearFieldErrors(['photos']);
     });
   }
 
@@ -453,21 +488,91 @@ class _DamageReportPageState extends State<DamageReportPage> {
     setState(() {
       _attachments.removeWhere((item) => item.id == attachment.id);
       _attachmentError = null;
+      _clearFieldErrors(['photos']);
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (!_canSubmit || _isSubmitting) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _isSubmitting = true;
+      _submitFieldErrors = const {};
+    });
+    try {
+      final response = await widget.repository.submitDamageReport(
+        DamageReportSubmission(
+          location: _locationController.text.trim(),
+          damageType: _itemController.text.trim(),
+          categoryCode: _selectedCategory!.code,
+          description: _descriptionController.text.trim(),
+          contact: _phoneController.text.trim(),
+          attachments: List.unmodifiable(_attachments),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _locationController.clear();
+        _itemController.clear();
+        _descriptionController.clear();
+        _phoneController.clear();
+        _attachments.clear();
+        _selectedCategory = null;
+        _attachmentError = null;
+        _locationTouched = false;
+        _itemTouched = false;
+        _descriptionTouched = false;
+        _phoneTouched = false;
+        _submitFieldErrors = const {};
+      });
+      _showSubmitMessage(response.message, success: true);
+    } on ServiceSubmissionFailure catch (failure) {
+      if (!mounted) return;
+      if (failure.type == ServiceSubmissionFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      setState(() => _submitFieldErrors = failure.fieldErrors);
+      _showSubmitMessage(failure.primaryMessage);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  String? _fieldError(String field) {
+    for (final entry in _submitFieldErrors.entries) {
+      if (entry.key == field || entry.key.startsWith('$field.')) {
+        return entry.value.firstOrNull;
+      }
+    }
+    return null;
+  }
+
+  void _clearFieldErrors(Iterable<String> fields) {
+    if (_submitFieldErrors.isEmpty) return;
+    final next = Map<String, List<String>>.from(_submitFieldErrors);
+    for (final field in fields) {
+      next.removeWhere((key, _) => key == field || key.startsWith('$field.'));
+    }
+    _submitFieldErrors = next;
+  }
+
+  void _showSubmitMessage(String message, {bool success = false}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: AppColors.mint, size: 22),
-              SizedBox(width: 10),
-              Expanded(child: Text('Laporan kerusakan berhasil dikirim.')),
+              Icon(
+                success ? Icons.check_circle_rounded : Icons.info_outline,
+                color: success ? AppColors.mint : AppColors.coral,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message)),
             ],
           ),
           margin: const EdgeInsets.all(20),
@@ -740,8 +845,10 @@ class _DamageIdentityPanel extends StatelessWidget {
     required this.itemFocus,
     required this.locationError,
     required this.itemError,
+    required this.categoryError,
     required this.category,
-    required this.onChanged,
+    required this.onLocationChanged,
+    required this.onItemChanged,
     required this.onChooseCategory,
   });
 
@@ -751,8 +858,10 @@ class _DamageIdentityPanel extends StatelessWidget {
   final FocusNode itemFocus;
   final String? locationError;
   final String? itemError;
+  final String? categoryError;
   final DamageCategory? category;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onLocationChanged;
+  final ValueChanged<String> onItemChanged;
   final VoidCallback onChooseCategory;
 
   @override
@@ -771,7 +880,7 @@ class _DamageIdentityPanel extends StatelessWidget {
             key: const Key('damage_location_field'),
             controller: locationController,
             focusNode: locationFocus,
-            onChanged: onChanged,
+            onChanged: onLocationChanged,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
@@ -786,7 +895,7 @@ class _DamageIdentityPanel extends StatelessWidget {
             key: const Key('damaged_item_field'),
             controller: itemController,
             focusNode: itemFocus,
-            onChanged: onChanged,
+            onChanged: onItemChanged,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(
@@ -871,6 +980,14 @@ class _DamageIdentityPanel extends StatelessWidget {
               ),
             ),
           ),
+          if (categoryError != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              categoryError!,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.coral),
+            ),
+          ],
         ],
       ),
     );
@@ -1064,7 +1181,7 @@ class _AttachmentPanel extends StatelessWidget {
                                 const SizedBox(height: 3),
                                 Text(
                                   canAdd
-                                      ? 'Gambar/video umum · maks. 20 MB'
+                                      ? 'Foto maks. 5 MB · video maks. 20 MB'
                                       : 'Hapus salah satu untuk mengganti file',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
@@ -1275,11 +1392,13 @@ class _SubmitBar extends StatelessWidget {
     required this.enabled,
     required this.hint,
     required this.onSubmit,
+    required this.loading,
   });
 
   final bool enabled;
   final String hint;
   final VoidCallback onSubmit;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -1333,9 +1452,18 @@ class _SubmitBar extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 key: const Key('submit_damage_report'),
-                onPressed: enabled ? onSubmit : null,
-                icon: const Icon(Icons.send_rounded, size: 19),
-                label: const Text('Kirim Laporan'),
+                onPressed: enabled && !loading ? onSubmit : null,
+                icon: loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send_rounded, size: 19),
+                label: Text(loading ? 'Mengirim…' : 'Kirim Laporan'),
               ),
             ),
           ],

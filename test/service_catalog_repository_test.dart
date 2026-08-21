@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,9 @@ import 'package:swp_mandala_mobile/core/network/api_client.dart';
 import 'package:swp_mandala_mobile/core/storage/token_storage.dart';
 import 'package:swp_mandala_mobile/features/service_catalog/data/remote_service_catalog_repository.dart';
 import 'package:swp_mandala_mobile/features/service_catalog/domain/service_catalog_failure.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_submission_failure.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_submission_models.dart';
+import 'package:swp_mandala_mobile/features/damage_report/damage_report_models.dart';
 
 class _MemoryTokenStorage implements TokenStorage {
   String? token = 'stored-token';
@@ -213,4 +217,280 @@ void main() {
     expect(server.message, isNot(contains('trace')));
     expect(unauthorized.type, ServiceCatalogFailureType.unauthorized);
   });
+
+  test('room submit sends the exact Laravel JSON contract', () async {
+    final repository = _repository((request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/api/permintaan-ruang-rapat');
+      expect(request.headers['Authorization'], 'Bearer stored-token');
+      expect(request.headers['Accept'], 'application/json');
+      expect(request.headers['Content-Type'], contains('application/json'));
+      expect(jsonDecode(request.body), {
+        'room_code': 'RPT-2V4N9',
+        'date': '2026-08-20',
+        'startTime': '08:00',
+        'endTime': '10:00',
+        'purpose': 'Rapat koordinasi program kerja',
+        'jumlahPeserta': '20',
+        'contact': '081234567890',
+        'jenisRapat': 'internal',
+        'needItSupport': false,
+        'itSupportDetail': null,
+        'isHybrid': true,
+        'hybridDetail': 'Menggunakan Zoom',
+      });
+      return http.Response(
+        jsonEncode({
+          'message': 'Pesan sukses ruang dari backend.',
+          'data': <String, Object?>{},
+        }),
+        201,
+      );
+    });
+
+    final response = await repository.submitRoomBooking(
+      const RoomBookingSubmission(
+        roomCode: 'RPT-2V4N9',
+        date: '2026-08-20',
+        startTime: '08:00',
+        endTime: '10:00',
+        purpose: 'Rapat koordinasi program kerja',
+        participantCount: '20',
+        contact: '081234567890',
+        meetingType: 'internal',
+        needItSupport: false,
+        itSupportDetail: null,
+        isHybrid: true,
+        hybridDetail: 'Menggunakan Zoom',
+      ),
+    );
+
+    expect(response.message, 'Pesan sukses ruang dari backend.');
+  });
+
+  test('ATK submit preserves real IDs and nullable custom item ID', () async {
+    final repository = _repository((request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/api/permintaan-atk');
+      final payload = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(payload['justification'], 'Kebutuhan operasional unit kerja');
+      expect(payload['contact'], '081234567890');
+      expect(payload['items'], [
+        {
+          'id': 353,
+          'name': 'Amplop Coklat A3',
+          'satuan': 'Buah',
+          'status': 'requested',
+          'requested': 3,
+          'approved': 0,
+        },
+        {
+          'id': null,
+          'name': 'Label Printer',
+          'satuan': 'Roll',
+          'status': 'requested',
+          'requested': 5,
+          'approved': 0,
+        },
+      ]);
+      return http.Response(
+        jsonEncode({'message': 'Pesan sukses ATK dari backend.'}),
+        201,
+      );
+    });
+
+    final response = await repository.submitOfficeSupplyRequest(
+      const OfficeSupplySubmission(
+        items: [
+          OfficeSupplySubmissionItem(
+            id: 353,
+            name: 'Amplop Coklat A3',
+            unit: 'Buah',
+            requested: 3,
+          ),
+          OfficeSupplySubmissionItem(
+            id: null,
+            name: 'Label Printer',
+            unit: 'Roll',
+            requested: 5,
+          ),
+        ],
+        justification: 'Kebutuhan operasional unit kerja',
+        contact: '081234567890',
+      ),
+    );
+
+    expect(response.message, 'Pesan sukses ATK dari backend.');
+  });
+
+  test('damage submit uses authenticated multipart photos array', () async {
+    final repository = _repository((request) async {
+      expect(request.method, 'POST');
+      expect(request.url.path, '/api/laporan-kerusakan-sarpras');
+      expect(request.headers['Authorization'], 'Bearer stored-token');
+      expect(request.headers['Accept'], 'application/json');
+      expect(
+        request.headers['Content-Type'],
+        startsWith('multipart/form-data;'),
+      );
+      final body = latin1.decode(request.bodyBytes);
+      expect(body, contains('name="location"'));
+      expect(body, contains('Gedung Sekretariat I Lantai 4'));
+      expect(body, contains('name="damageType"'));
+      expect(body, contains('AC Ruang Rapat'));
+      expect(body, contains('name="kategori"'));
+      expect(body, contains('KRN-Q9HCF'));
+      expect(body, contains('name="description"'));
+      expect(body, contains('AC tidak dingin.'));
+      expect(body, contains('name="contact"'));
+      expect(body, contains('081234567890'));
+      expect(body, contains('name="photos[]"'));
+      expect(body, contains('filename="bukti.jpg"'));
+      return http.Response(
+        jsonEncode({'message': 'Pesan sukses laporan dari backend.'}),
+        201,
+      );
+    });
+
+    final response = await repository.submitDamageReport(
+      DamageReportSubmission(
+        location: 'Gedung Sekretariat I Lantai 4',
+        damageType: 'AC Ruang Rapat',
+        categoryCode: 'KRN-Q9HCF',
+        description: 'AC tidak dingin.',
+        contact: '081234567890',
+        attachments: [
+          DamageAttachment(
+            id: 'attachment-1',
+            name: 'bukti.jpg',
+            sizeBytes: 3,
+            kind: DamageAttachmentKind.image,
+            previewBytes: Uint8List.fromList([1, 2, 3]),
+          ),
+        ],
+      ),
+    );
+
+    expect(response.message, 'Pesan sukses laporan dari backend.');
+  });
+
+  test(
+    'Laravel validation message and field errors are not swallowed',
+    () async {
+      final repository = _repository(
+        (request) async => http.Response(
+          jsonEncode({
+            'message': 'The given data was invalid.',
+            'errors': {
+              'contact': ['The contact field is required.'],
+              'photos.0': ['Ukuran foto maksimal 5 MB.'],
+            },
+          }),
+          422,
+        ),
+      );
+
+      try {
+        await repository.submitDamageReport(
+          DamageReportSubmission(
+            location: 'Gedung I',
+            damageType: 'AC',
+            categoryCode: 'KRN-AIR',
+            description: 'Rusak',
+            contact: '',
+            attachments: [
+              DamageAttachment(
+                id: 'attachment-1',
+                name: 'besar.jpg',
+                sizeBytes: 6 * 1024 * 1024,
+                kind: DamageAttachmentKind.image,
+                previewBytes: Uint8List(1),
+              ),
+            ],
+          ),
+        );
+        fail('Expected validation failure.');
+      } on ServiceSubmissionFailure catch (failure) {
+        expect(failure.type, ServiceSubmissionFailureType.validation);
+        expect(failure.message, 'The given data was invalid.');
+        expect(
+          failure.messageFor(['contact']),
+          'The contact field is required.',
+        );
+        expect(failure.messageFor(['photos']), 'Ukuran foto maksimal 5 MB.');
+        expect(failure.primaryMessage, 'The contact field is required.');
+      }
+    },
+  );
+
+  test('business and server JSON messages remain user-facing', () async {
+    Future<ServiceSubmissionFailure> failureFor(
+      int status,
+      String message,
+    ) async {
+      final repository = _repository(
+        (request) async =>
+            http.Response(jsonEncode({'message': message}), status),
+      );
+      try {
+        await repository.submitOfficeSupplyRequest(
+          const OfficeSupplySubmission(
+            items: [],
+            justification: 'Kebutuhan unit',
+            contact: '081234567890',
+          ),
+        );
+        fail('Expected submission failure.');
+      } on ServiceSubmissionFailure catch (failure) {
+        return failure;
+      }
+    }
+
+    final business = await failureFor(403, 'Pengajuan tidak diizinkan.');
+    final server = await failureFor(500, 'Terjadi kesalahan khusus backend.');
+
+    expect(business.message, 'Pengajuan tidak diizinkan.');
+    expect(server.message, 'Terjadi kesalahan khusus backend.');
+  });
+
+  test(
+    'submit connection fallback is friendly only without a response',
+    () async {
+      final repository = _repository(
+        (request) => throw http.ClientException('socket detail'),
+      );
+
+      expect(
+        repository.submitRoomBooking(
+          const RoomBookingSubmission(
+            roomCode: 'RPT-2V4N9',
+            date: '2026-08-20',
+            startTime: '08:00',
+            endTime: '10:00',
+            purpose: 'Rapat',
+            participantCount: '2',
+            contact: '081234567890',
+            meetingType: 'internal',
+            needItSupport: false,
+            itSupportDetail: null,
+            isHybrid: false,
+            hybridDetail: null,
+          ),
+        ),
+        throwsA(
+          isA<ServiceSubmissionFailure>()
+              .having(
+                (failure) => failure.type,
+                'type',
+                ServiceSubmissionFailureType.connection,
+              )
+              .having(
+                (failure) => failure.message,
+                'message',
+                'Tidak dapat terhubung ke server. Silakan coba lagi.',
+              ),
+        ),
+      );
+    },
+  );
 }

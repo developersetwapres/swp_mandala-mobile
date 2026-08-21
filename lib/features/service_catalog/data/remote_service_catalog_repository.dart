@@ -2,11 +2,14 @@
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/api_upload_file.dart';
 import '../../damage_report/damage_report_models.dart';
 import '../../meeting_room/meeting_room_models.dart';
 import '../../office_supply/office_supply_models.dart';
 import '../domain/service_catalog_failure.dart';
 import '../domain/service_catalog_repository.dart';
+import '../domain/service_submission_failure.dart';
+import '../domain/service_submission_models.dart';
 
 class RemoteServiceCatalogRepository implements ServiceCatalogRepository {
   RemoteServiceCatalogRepository({required ApiClient apiClient})
@@ -106,6 +109,114 @@ class RemoteServiceCatalogRepository implements ServiceCatalogRepository {
     } catch (error) {
       throw _mapFailure(error, 'Kategori kerusakan belum dapat dimuat.');
     }
+  }
+
+  @override
+  Future<ServiceSubmitResponse> submitRoomBooking(
+    RoomBookingSubmission submission,
+  ) => _submitJson(
+    path: '/permintaan-ruang-rapat',
+    body: submission.toJson(),
+    fallbackMessage: 'Permintaan ruang rapat berhasil diajukan.',
+  );
+
+  @override
+  Future<ServiceSubmitResponse> submitOfficeSupplyRequest(
+    OfficeSupplySubmission submission,
+  ) => _submitJson(
+    path: '/permintaan-atk',
+    body: submission.toJson(),
+    fallbackMessage: 'Permintaan ATK berhasil diajukan.',
+  );
+
+  Future<ServiceSubmitResponse> _submitJson({
+    required String path,
+    required Map<String, dynamic> body,
+    required String fallbackMessage,
+  }) async {
+    try {
+      final payload = await _apiClient.post(
+        path,
+        body: body,
+        authenticated: true,
+      );
+      return ServiceSubmitResponse.fromJson(
+        payload,
+        fallbackMessage: fallbackMessage,
+      );
+    } catch (error) {
+      throw _mapSubmissionFailure(error);
+    }
+  }
+
+  @override
+  Future<ServiceSubmitResponse> submitDamageReport(
+    DamageReportSubmission submission,
+  ) async {
+    try {
+      final files = submission.attachments
+          .map(
+            (attachment) => ApiUploadFile(
+              field: 'photos[]',
+              filename: attachment.name,
+              path: attachment.path,
+              bytes: attachment.bytes,
+            ),
+          )
+          .toList(growable: false);
+      final payload = await _apiClient.multipartPost(
+        '/laporan-kerusakan-sarpras',
+        authenticated: true,
+        fields: {
+          'location': submission.location,
+          'damageType': submission.damageType,
+          'kategori': submission.categoryCode,
+          'description': submission.description,
+          'contact': submission.contact,
+        },
+        files: files,
+      );
+      return ServiceSubmitResponse.fromJson(
+        payload,
+        fallbackMessage: 'Laporan kerusakan berhasil dikirim.',
+      );
+    } catch (error) {
+      throw _mapSubmissionFailure(error);
+    }
+  }
+
+  ServiceSubmissionFailure _mapSubmissionFailure(Object error) {
+    if (error is ServiceSubmissionFailure) return error;
+    if (error is ApiConnectionException) {
+      return const ServiceSubmissionFailure(
+        type: ServiceSubmissionFailureType.connection,
+        message: 'Tidak dapat terhubung ke server. Silakan coba lagi.',
+      );
+    }
+    if (error is ApiException) {
+      final type = switch (error.statusCode) {
+        401 => ServiceSubmissionFailureType.unauthorized,
+        403 => ServiceSubmissionFailureType.forbidden,
+        404 => ServiceSubmissionFailureType.notFound,
+        422 => ServiceSubmissionFailureType.validation,
+        _ => ServiceSubmissionFailureType.server,
+      };
+      return ServiceSubmissionFailure(
+        type: type,
+        message: error.message,
+        fieldErrors: error.fieldErrors,
+      );
+    }
+    if (error is FormatException || error is StateError) {
+      return const ServiceSubmissionFailure(
+        type: ServiceSubmissionFailureType.invalidResponse,
+        message: 'Respons server belum dapat diproses.',
+      );
+    }
+    return const ServiceSubmissionFailure(
+      type: ServiceSubmissionFailureType.server,
+      message: 'Permintaan belum dapat diproses. Silakan coba lagi.',
+    );
   }
 
   List<T> _parseList<T>({

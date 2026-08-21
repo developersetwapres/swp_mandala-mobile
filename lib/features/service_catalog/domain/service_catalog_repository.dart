@@ -1,6 +1,7 @@
 import '../../damage_report/damage_report_models.dart';
 import '../../meeting_room/meeting_room_models.dart';
 import '../../office_supply/office_supply_models.dart';
+import 'service_submission_models.dart';
 
 abstract interface class ServiceCatalogRepository {
   Future<List<MeetingRoom>> getAvailableRooms({
@@ -16,4 +17,16 @@ abstract interface class ServiceCatalogRepository {
   });
 
   Future<List<DamageCategory>> getDamageCategories({bool forceRefresh = false});
+
+  Future<ServiceSubmitResponse> submitRoomBooking(
+    RoomBookingSubmission submission,
+  );
+
+  Future<ServiceSubmitResponse> submitOfficeSupplyRequest(
+    OfficeSupplySubmission submission,
+  );
+
+  Future<ServiceSubmitResponse> submitDamageReport(
+    DamageReportSubmission submission,
+  );
 }

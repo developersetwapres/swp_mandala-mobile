@@ -49,12 +49,14 @@ class DamageAttachmentCandidate {
     required this.sizeBytes,
     required this.kind,
     this.previewBytes,
+    this.path,
   });
 
   final String name;
   final int sizeBytes;
   final DamageAttachmentKind kind;
   final Uint8List? previewBytes;
+  final String? path;
 }
 
 class DamageAttachment {
@@ -64,6 +66,7 @@ class DamageAttachment {
     required this.sizeBytes,
     required this.kind,
     this.previewBytes,
+    this.path,
   });
 
   final String id;
@@ -71,6 +74,9 @@ class DamageAttachment {
   final int sizeBytes;
   final DamageAttachmentKind kind;
   final Uint8List? previewBytes;
+  final String? path;
+
+  Uint8List? get bytes => previewBytes;
 }
 
 abstract interface class DamageMediaPicker {

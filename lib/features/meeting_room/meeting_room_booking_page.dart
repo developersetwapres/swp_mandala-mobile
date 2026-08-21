@@ -6,6 +6,8 @@ import '../auth/domain/app_user.dart';
 import '../auth/presentation/auth_scope.dart';
 import '../service_catalog/domain/service_catalog_failure.dart';
 import '../service_catalog/domain/service_catalog_repository.dart';
+import '../service_catalog/domain/service_submission_failure.dart';
+import '../service_catalog/domain/service_submission_models.dart';
 import 'meeting_room_models.dart';
 import 'room_detail_sheet.dart';
 
@@ -46,6 +48,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   bool _participantTouched = false;
   bool _hybridMeeting = false;
   bool _itSupport = false;
+  bool _isSubmitting = false;
+  Map<String, List<String>> _submitFieldErrors = const {};
   List<MeetingRoom> _rooms = const [];
   bool _isLoadingRooms = false;
   String? _roomError;
@@ -94,6 +98,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   int? get _participantCount => int.tryParse(_participantController.text);
 
   String? get _participantError {
+    final backendError = _fieldError('jumlahPeserta');
+    if (backendError != null) return backendError;
     if (!_participantTouched || _participantController.text.isEmpty) {
       return null;
     }
@@ -117,7 +123,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
 
   bool get _isPhoneValid {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 9;
+    return digits.length >= 9 && _phoneController.text.length <= 15;
   }
 
   bool get _canSubmit {
@@ -126,6 +132,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         _meetingType != null &&
         _isParticipantValid &&
         _activityController.text.trim().isNotEmpty &&
+        _activityController.text.trim().length <= 255 &&
+        _hybridNoteController.text.trim().length <= 255 &&
+        _itNoteController.text.trim().length <= 255 &&
         _isPhoneValid;
   }
 
@@ -255,13 +264,28 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                                         activityController: _activityController,
                                         phoneController: _phoneController,
                                         participantError: _participantError,
-                                        onTypeChanged: (value) => setState(
-                                          () => _meetingType = value,
+                                        meetingTypeError: _fieldError(
+                                          'jenisRapat',
                                         ),
-                                        onParticipantChanged: (_) => setState(
-                                          () => _participantTouched = true,
+                                        activityError: _fieldError('purpose'),
+                                        phoneError: _fieldError('contact'),
+                                        onTypeChanged: (value) => setState(() {
+                                          _meetingType = value;
+                                          _clearFieldErrors(['jenisRapat']);
+                                        }),
+                                        onParticipantChanged: (_) =>
+                                            setState(() {
+                                              _participantTouched = true;
+                                              _clearFieldErrors([
+                                                'jumlahPeserta',
+                                              ]);
+                                            }),
+                                        onActivityChanged: (_) => setState(
+                                          () => _clearFieldErrors(['purpose']),
                                         ),
-                                        onChanged: (_) => setState(() {}),
+                                        onPhoneChanged: (_) => setState(
+                                          () => _clearFieldErrors(['contact']),
+                                        ),
                                       ),
                                       const SizedBox(height: 32),
                                       const _SectionIntro(
@@ -283,6 +307,20 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                                         onItChanged: () => setState(
                                           () => _itSupport = !_itSupport,
                                         ),
+                                        hybridError: _fieldError(
+                                          'hybridDetail',
+                                        ),
+                                        itError: _fieldError('itSupportDetail'),
+                                        onHybridNoteChanged: (_) => setState(
+                                          () => _clearFieldErrors([
+                                            'hybridDetail',
+                                          ]),
+                                        ),
+                                        onItNoteChanged: (_) => setState(
+                                          () => _clearFieldErrors([
+                                            'itSupportDetail',
+                                          ]),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -297,8 +335,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ],
         ),
         bottomNavigationBar: _SubmitBar(
-          enabled: _canSubmit,
-          hint: _submitHint,
+          enabled: _canSubmit && !_isSubmitting,
+          loading: _isSubmitting,
+          hint: _isSubmitting ? 'Mengirim pemesanan…' : _submitHint,
           onSubmit: _submit,
         ),
       ),
@@ -336,10 +375,16 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       selectedRoom: _selectedRoom,
       onSelect: _selectRoom,
       onDetail: _showRoomDetail,
+      fieldError: _fieldError('room_code') ?? _fieldError('room'),
     );
   }
 
   String? get _scheduleError {
+    final backendError =
+        _fieldError('date') ??
+        _fieldError('startTime') ??
+        _fieldError('endTime');
+    if (backendError != null) return backendError;
     if (_selectedDate != null) {
       final day = DateTime(
         _selectedDate!.year,
@@ -370,6 +415,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       _selectedDate = picked;
       _selectedRoom = null;
       _timeError = null;
+      _clearFieldErrors(['date']);
     });
     _refreshRoomsIfScheduleValid();
   }
@@ -393,6 +439,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       } else {
         _timeError = null;
       }
+      _clearFieldErrors(['startTime', 'endTime']);
     });
     _refreshRoomsIfScheduleValid();
   }
@@ -427,6 +474,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         _endTime = picked;
         _timeError = null;
       }
+      _clearFieldErrors(['endTime']);
     });
     _refreshRoomsIfScheduleValid();
   }
@@ -485,6 +533,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     if (!room.isAvailable) return;
     setState(() {
       _selectedRoom = room;
+      _clearFieldErrors(['room_code', 'room']);
       _participantTouched = _participantController.text.isNotEmpty;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -511,8 +560,79 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (!_canSubmit || _isSubmitting) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _isSubmitting = true;
+      _submitFieldErrors = const {};
+    });
+    try {
+      final response = await widget.repository.submitRoomBooking(
+        RoomBookingSubmission(
+          roomCode: _selectedRoom!.code,
+          date: _apiDate(_selectedDate!),
+          startTime: _apiTime(_startTime!),
+          endTime: _apiTime(_endTime!),
+          purpose: _activityController.text.trim(),
+          participantCount: _participantController.text.trim(),
+          contact: _phoneController.text.trim(),
+          meetingType: _meetingType!.name,
+          needItSupport: _itSupport,
+          itSupportDetail: _itSupport
+              ? _nullableText(_itNoteController.text)
+              : null,
+          isHybrid: _hybridMeeting,
+          hybridDetail: _hybridMeeting
+              ? _nullableText(_hybridNoteController.text)
+              : null,
+        ),
+      );
+      if (!mounted) return;
+      _resetAfterSuccess();
+      _showSubmitMessage(response.message, success: true);
+    } on ServiceSubmissionFailure catch (failure) {
+      if (!mounted) return;
+      if (failure.type == ServiceSubmissionFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      setState(() => _submitFieldErrors = failure.fieldErrors);
+      _showSubmitMessage(failure.primaryMessage);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _resetAfterSuccess() {
+    setState(() {
+      _selectedRoom = null;
+      _meetingType = null;
+      _hybridMeeting = false;
+      _itSupport = false;
+      _participantTouched = false;
+      _submitFieldErrors = const {};
+      _participantController.clear();
+      _activityController.clear();
+      _phoneController.clear();
+      _hybridNoteController.clear();
+      _itNoteController.clear();
+    });
+  }
+
+  String? _fieldError(String field) => _submitFieldErrors[field]?.firstOrNull;
+
+  void _clearFieldErrors(Iterable<String> fields) {
+    if (_submitFieldErrors.isEmpty) return;
+    final next = Map<String, List<String>>.from(_submitFieldErrors);
+    for (final field in fields) {
+      next.remove(field);
+    }
+    _submitFieldErrors = next;
+  }
+
+  void _showSubmitMessage(String message, {bool success = false}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..hideCurrentSnackBar()
@@ -520,23 +640,33 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         SnackBar(
           content: Row(
             children: [
-              const Icon(
-                Icons.check_circle_rounded,
-                color: AppColors.mint,
+              Icon(
+                success ? Icons.check_circle_rounded : Icons.info_outline,
+                color: success ? AppColors.mint : AppColors.coral,
                 size: 22,
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Pemesanan ${_selectedRoom!.name} berhasil diajukan.',
-                ),
-              ),
+              Expanded(child: Text(message)),
             ],
           ),
           margin: const EdgeInsets.all(20),
         ),
       );
   }
+
+  static String? _nullableText(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static String _apiDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  static String _apiTime(TimeOfDay time) =>
+      '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
 
   static int _minutes(TimeOfDay time) => time.hour * 60 + time.minute;
 
@@ -1061,12 +1191,14 @@ class _RoomAvailabilitySection extends StatelessWidget {
     required this.selectedRoom,
     required this.onSelect,
     required this.onDetail,
+    this.fieldError,
   });
 
   final List<MeetingRoom> rooms;
   final MeetingRoom? selectedRoom;
   final ValueChanged<MeetingRoom> onSelect;
   final ValueChanged<MeetingRoom> onDetail;
+  final String? fieldError;
 
   @override
   Widget build(BuildContext context) {
@@ -1079,6 +1211,14 @@ class _RoomAvailabilitySection extends StatelessWidget {
           subtitle: 'Ketersediaan sesuai jadwal yang kamu pilih.',
         ),
         const SizedBox(height: 14),
+        if (fieldError != null) ...[
+          Text(
+            fieldError!,
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: AppColors.coral),
+          ),
+          const SizedBox(height: 10),
+        ],
         ...rooms.indexed.map(
           (entry) => Padding(
             padding: EdgeInsets.only(
@@ -1253,9 +1393,13 @@ class _MeetingInformationPanel extends StatelessWidget {
     required this.activityController,
     required this.phoneController,
     required this.participantError,
+    required this.meetingTypeError,
+    required this.activityError,
+    required this.phoneError,
     required this.onTypeChanged,
     required this.onParticipantChanged,
-    required this.onChanged,
+    required this.onActivityChanged,
+    required this.onPhoneChanged,
   });
 
   final MeetingType? selectedType;
@@ -1263,9 +1407,13 @@ class _MeetingInformationPanel extends StatelessWidget {
   final TextEditingController activityController;
   final TextEditingController phoneController;
   final String? participantError;
+  final String? meetingTypeError;
+  final String? activityError;
+  final String? phoneError;
   final ValueChanged<MeetingType> onTypeChanged;
   final ValueChanged<String> onParticipantChanged;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onActivityChanged;
+  final ValueChanged<String> onPhoneChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1300,6 +1448,14 @@ class _MeetingInformationPanel extends StatelessWidget {
                 )
                 .toList(),
           ),
+          if (meetingTypeError != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              meetingTypeError!,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.coral),
+            ),
+          ],
           const SizedBox(height: 18),
           TextField(
             key: const Key('participant_field'),
@@ -1320,29 +1476,31 @@ class _MeetingInformationPanel extends StatelessWidget {
           TextField(
             key: const Key('activity_field'),
             controller: activityController,
-            onChanged: onChanged,
+            onChanged: onActivityChanged,
             textCapitalization: TextCapitalization.sentences,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Kegiatan',
               hintText: 'Nama atau judul kegiatan',
-              prefixIcon: Icon(Icons.edit_calendar_outlined),
+              prefixIcon: const Icon(Icons.edit_calendar_outlined),
+              errorText: activityError,
             ),
           ),
           const SizedBox(height: 13),
           TextField(
             key: const Key('phone_field'),
             controller: phoneController,
-            onChanged: onChanged,
+            onChanged: onPhoneChanged,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.done,
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
             ],
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'No. HP',
               hintText: 'Nomor contact person',
-              prefixIcon: Icon(Icons.phone_outlined),
+              prefixIcon: const Icon(Icons.phone_outlined),
+              errorText: phoneError,
             ),
           ),
         ],
@@ -1421,6 +1579,10 @@ class _SupportPanel extends StatelessWidget {
     required this.itNoteController,
     required this.onHybridChanged,
     required this.onItChanged,
+    required this.hybridError,
+    required this.itError,
+    required this.onHybridNoteChanged,
+    required this.onItNoteChanged,
   });
 
   final bool hybridMeeting;
@@ -1429,6 +1591,10 @@ class _SupportPanel extends StatelessWidget {
   final TextEditingController itNoteController;
   final VoidCallback onHybridChanged;
   final VoidCallback onItChanged;
+  final String? hybridError;
+  final String? itError;
+  final ValueChanged<String> onHybridNoteChanged;
+  final ValueChanged<String> onItNoteChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1488,13 +1654,15 @@ class _SupportPanel extends StatelessWidget {
                         TextField(
                           key: const Key('hybrid_note_field'),
                           controller: hybridNoteController,
+                          onChanged: onHybridNoteChanged,
                           minLines: 2,
                           maxLines: 3,
                           textCapitalization: TextCapitalization.sentences,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Catatan Rapat Hybrid (Optional)',
                             hintText: 'Contoh: membutuhkan tautan meeting',
                             alignLabelWithHint: true,
+                            errorText: hybridError,
                           ),
                         ),
                       ],
@@ -1503,13 +1671,15 @@ class _SupportPanel extends StatelessWidget {
                         TextField(
                           key: const Key('it_note_field'),
                           controller: itNoteController,
+                          onChanged: onItNoteChanged,
                           minLines: 2,
                           maxLines: 3,
                           textCapitalization: TextCapitalization.sentences,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Catatan Dukungan IT (Optional)',
                             hintText: 'Jelaskan bantuan yang dibutuhkan',
                             alignLabelWithHint: true,
+                            errorText: itError,
                           ),
                         ),
                       ],
@@ -1619,11 +1789,13 @@ class _SubmitBar extends StatelessWidget {
     required this.enabled,
     required this.hint,
     required this.onSubmit,
+    required this.loading,
   });
 
   final bool enabled;
   final String hint;
   final VoidCallback onSubmit;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -1679,9 +1851,18 @@ class _SubmitBar extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   key: const Key('submit_booking'),
-                  onPressed: enabled ? onSubmit : null,
-                  icon: const Icon(Icons.send_rounded, size: 19),
-                  label: const Text('Ajukan Pemesanan'),
+                  onPressed: enabled && !loading ? onSubmit : null,
+                  icon: loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded, size: 19),
+                  label: Text(loading ? 'Mengirim…' : 'Ajukan Pemesanan'),
                 ),
               ),
             ],

@@ -6,6 +6,8 @@ import '../auth/domain/app_user.dart';
 import '../auth/presentation/auth_scope.dart';
 import '../service_catalog/domain/service_catalog_failure.dart';
 import '../service_catalog/domain/service_catalog_repository.dart';
+import '../service_catalog/domain/service_submission_failure.dart';
+import '../service_catalog/domain/service_submission_models.dart';
 import 'office_supply_models.dart';
 import 'office_supply_selector_sheet.dart';
 import 'supply_item_editor_sheet.dart';
@@ -44,6 +46,8 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
   List<OfficeSupply> _masterSupplies = const [_otherSupply];
   bool _isLoadingSupplies = true;
   String? _supplyError;
+  bool _isSubmitting = false;
+  Map<String, List<String>> _submitFieldErrors = const {};
 
   @override
   void initState() {
@@ -66,13 +70,20 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
 
   bool get _isPhoneValid {
     final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 9;
+    return digits.length >= 9 && _phoneController.text.length <= 15;
   }
 
-  bool get _canSubmit => _requestedItems.isNotEmpty && _isPhoneValid;
+  bool get _isJustificationValid {
+    final value = _noteController.text.trim();
+    return value.isNotEmpty && value.length <= 255;
+  }
+
+  bool get _canSubmit =>
+      _requestedItems.isNotEmpty && _isJustificationValid && _isPhoneValid;
 
   String get _submitHint {
     if (_requestedItems.isEmpty) return 'Tambahkan minimal satu item ATK';
+    if (!_isJustificationValid) return 'Lengkapi keterangan kebutuhan';
     if (!_isPhoneValid) return 'Lengkapi nomor HP yang dapat dihubungi';
     return '${_requestedItems.length} item siap diajukan';
   }
@@ -129,6 +140,14 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
                             onDecrease: (item) => _changeQuantity(item, -1),
                             onIncrease: (item) => _changeQuantity(item, 1),
                           ),
+                          if (_fieldError('items') != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _fieldError('items')!,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.coral),
+                            ),
+                          ],
                           if (_isLoadingSupplies ||
                               _supplyError != null ||
                               (!_isLoadingSupplies &&
@@ -154,7 +173,13 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
                                 'Tambahkan catatan bila ada kebutuhan khusus.',
                           ),
                           const SizedBox(height: 14),
-                          _NotePanel(controller: _noteController),
+                          _NotePanel(
+                            controller: _noteController,
+                            error: _fieldError('justification'),
+                            onChanged: (_) => setState(
+                              () => _clearFieldErrors(['justification']),
+                            ),
+                          ),
                           const SizedBox(height: 32),
                           const _SectionIntro(
                             number: '04',
@@ -165,10 +190,13 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
                           _PhonePanel(
                             controller: _phoneController,
                             focusNode: _phoneFocus,
-                            error: _phoneTouched && !_isPhoneValid
-                                ? 'Masukkan nomor HP aktif, minimal 9 digit.'
-                                : null,
-                            onChanged: (_) => setState(() {}),
+                            error:
+                                _fieldError('contact') ??
+                                (_phoneTouched && !_isPhoneValid
+                                    ? 'Masukkan nomor HP aktif, 9–15 karakter.'
+                                    : null),
+                            onChanged: (_) =>
+                                setState(() => _clearFieldErrors(['contact'])),
                           ),
                         ],
                       ),
@@ -180,8 +208,9 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
           ],
         ),
         bottomNavigationBar: _SubmitBar(
-          enabled: _canSubmit,
-          hint: _submitHint,
+          enabled: _canSubmit && !_isSubmitting,
+          loading: _isSubmitting,
+          hint: _isSubmitting ? 'Mengirim permintaan…' : _submitHint,
           onSubmit: _submit,
         ),
       ),
@@ -289,6 +318,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
   }
 
   void _addDraft(SupplyDraft draft) {
+    _clearFieldErrors(['items']);
     if (draft.masterId != null) {
       final existingIndex = _requestedItems.indexWhere(
         (item) => item.masterId == draft.masterId,
@@ -343,6 +373,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
   }
 
   void _updateItem(RequestedSupply original, SupplyDraft draft) {
+    _clearFieldErrors(['items']);
     final originalIndex = _requestedItems.indexWhere(
       (item) => item.id == original.id,
     );
@@ -405,6 +436,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
     final index = _requestedItems.indexWhere((entry) => entry.id == item.id);
     if (index == -1) return;
     setState(() => _requestedItems.removeAt(index));
+    _clearFieldErrors(['items']);
 
     final messenger = ScaffoldMessenger.of(context);
     messenger
@@ -433,18 +465,79 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
       );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (!_canSubmit || _isSubmitting) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _isSubmitting = true;
+      _submitFieldErrors = const {};
+    });
+    try {
+      final response = await widget.repository.submitOfficeSupplyRequest(
+        OfficeSupplySubmission(
+          items: _requestedItems
+              .map(
+                (item) => OfficeSupplySubmissionItem(
+                  id: item.isCustom ? null : int.tryParse(item.masterId ?? ''),
+                  name: item.name,
+                  unit: item.unit,
+                  requested: item.quantity,
+                ),
+              )
+              .toList(growable: false),
+          justification: _noteController.text.trim(),
+          contact: _phoneController.text.trim(),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _requestedItems.clear();
+        _noteController.clear();
+        _phoneController.clear();
+        _phoneTouched = false;
+        _submitFieldErrors = const {};
+      });
+      _showSubmitMessage(response.message, success: true);
+    } on ServiceSubmissionFailure catch (failure) {
+      if (!mounted) return;
+      if (failure.type == ServiceSubmissionFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      setState(() => _submitFieldErrors = failure.fieldErrors);
+      _showSubmitMessage(failure.primaryMessage);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  String? _fieldError(String field) => _submitFieldErrors[field]?.firstOrNull;
+
+  void _clearFieldErrors(Iterable<String> fields) {
+    if (_submitFieldErrors.isEmpty) return;
+    final next = Map<String, List<String>>.from(_submitFieldErrors);
+    for (final field in fields) {
+      next.removeWhere((key, _) => key == field || key.startsWith('$field.'));
+    }
+    _submitFieldErrors = next;
+  }
+
+  void _showSubmitMessage(String message, {bool success = false}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: AppColors.mint, size: 22),
-              SizedBox(width: 10),
-              Expanded(child: Text('Permintaan ATK berhasil diajukan.')),
+              Icon(
+                success ? Icons.check_circle_rounded : Icons.info_outline,
+                color: success ? AppColors.mint : AppColors.coral,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message)),
             ],
           ),
           margin: const EdgeInsets.all(20),
@@ -1026,9 +1119,15 @@ class _RequestedItemCard extends StatelessWidget {
 }
 
 class _NotePanel extends StatelessWidget {
-  const _NotePanel({required this.controller});
+  const _NotePanel({
+    required this.controller,
+    required this.error,
+    required this.onChanged,
+  });
 
   final TextEditingController controller;
+  final String? error;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1042,14 +1141,16 @@ class _NotePanel extends StatelessWidget {
       child: TextField(
         key: const Key('supply_note_field'),
         controller: controller,
+        onChanged: onChanged,
         minLines: 3,
         maxLines: 5,
         textCapitalization: TextCapitalization.sentences,
         keyboardType: TextInputType.multiline,
-        decoration: const InputDecoration(
-          labelText: 'Keterangan (Optional)',
+        decoration: InputDecoration(
+          labelText: 'Keterangan',
           hintText: 'Contoh: digunakan untuk administrasi bulanan',
           alignLabelWithHint: true,
+          errorText: error,
         ),
       ),
     );
@@ -1102,11 +1203,13 @@ class _SubmitBar extends StatelessWidget {
     required this.enabled,
     required this.hint,
     required this.onSubmit,
+    required this.loading,
   });
 
   final bool enabled;
   final String hint;
   final VoidCallback onSubmit;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -1160,9 +1263,18 @@ class _SubmitBar extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 key: const Key('submit_supply_request'),
-                onPressed: enabled ? onSubmit : null,
-                icon: const Icon(Icons.send_rounded, size: 19),
-                label: const Text('Ajukan Permintaan'),
+                onPressed: enabled && !loading ? onSubmit : null,
+                icon: loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send_rounded, size: 19),
+                label: Text(loading ? 'Mengirim…' : 'Ajukan Permintaan'),
               ),
             ),
           ],

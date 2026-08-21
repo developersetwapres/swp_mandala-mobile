@@ -7,6 +7,8 @@ import 'package:swp_mandala_mobile/features/damage_report/damage_report_models.d
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_models.dart';
 import 'package:swp_mandala_mobile/features/office_supply/office_supply_models.dart';
 import 'package:swp_mandala_mobile/features/service_catalog/domain/service_catalog_repository.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_submission_failure.dart';
+import 'package:swp_mandala_mobile/features/service_catalog/domain/service_submission_models.dart';
 
 const testUser = AppUser(
   id: 7,
@@ -23,6 +25,12 @@ class TestServiceCatalogRepository implements ServiceCatalogRepository {
     this.roomError,
     this.supplyError,
     this.categoryError,
+    this.roomSubmitError,
+    this.supplySubmitError,
+    this.damageSubmitError,
+    this.roomSubmitFuture,
+    this.supplySubmitFuture,
+    this.damageSubmitFuture,
   });
 
   final List<MeetingRoom> rooms;
@@ -31,9 +39,21 @@ class TestServiceCatalogRepository implements ServiceCatalogRepository {
   final Object? roomError;
   final Object? supplyError;
   final Object? categoryError;
+  final ServiceSubmissionFailure? roomSubmitError;
+  final ServiceSubmissionFailure? supplySubmitError;
+  final ServiceSubmissionFailure? damageSubmitError;
+  final Future<ServiceSubmitResponse>? roomSubmitFuture;
+  final Future<ServiceSubmitResponse>? supplySubmitFuture;
+  final Future<ServiceSubmitResponse>? damageSubmitFuture;
   int roomCalls = 0;
   int supplyCalls = 0;
   int categoryCalls = 0;
+  int roomSubmitCalls = 0;
+  int supplySubmitCalls = 0;
+  int damageSubmitCalls = 0;
+  RoomBookingSubmission? submittedRoom;
+  OfficeSupplySubmission? submittedSupply;
+  DamageReportSubmission? submittedDamage;
 
   static const defaultRooms = [
     MeetingRoom(
@@ -151,6 +171,45 @@ class TestServiceCatalogRepository implements ServiceCatalogRepository {
     categoryCalls += 1;
     if (categoryError case final error?) throw error;
     return categories;
+  }
+
+  @override
+  Future<ServiceSubmitResponse> submitRoomBooking(
+    RoomBookingSubmission submission,
+  ) async {
+    roomSubmitCalls += 1;
+    submittedRoom = submission;
+    if (roomSubmitError case final error?) throw error;
+    if (roomSubmitFuture case final future?) return future;
+    return const ServiceSubmitResponse(
+      message: 'Pemesanan Ruang Rapat Buton berhasil diajukan.',
+    );
+  }
+
+  @override
+  Future<ServiceSubmitResponse> submitOfficeSupplyRequest(
+    OfficeSupplySubmission submission,
+  ) async {
+    supplySubmitCalls += 1;
+    submittedSupply = submission;
+    if (supplySubmitError case final error?) throw error;
+    if (supplySubmitFuture case final future?) return future;
+    return const ServiceSubmitResponse(
+      message: 'Permintaan ATK berhasil diajukan.',
+    );
+  }
+
+  @override
+  Future<ServiceSubmitResponse> submitDamageReport(
+    DamageReportSubmission submission,
+  ) async {
+    damageSubmitCalls += 1;
+    submittedDamage = submission;
+    if (damageSubmitError case final error?) throw error;
+    if (damageSubmitFuture case final future?) return future;
+    return const ServiceSubmitResponse(
+      message: 'Laporan kerusakan berhasil dikirim.',
+    );
   }
 }
 

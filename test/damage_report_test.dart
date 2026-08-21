@@ -29,12 +29,15 @@ class _FakeMediaPicker implements DamageMediaPicker {
 }
 
 void main() {
-  Widget reportApp(_FakeMediaPicker picker) {
+  Widget reportApp(
+    _FakeMediaPicker picker, {
+    TestServiceCatalogRepository? repository,
+  }) {
     return MaterialApp(
       theme: AppTheme.light,
       home: DamageReportPage(
         user: testUser,
-        repository: TestServiceCatalogRepository(),
+        repository: repository ?? TestServiceCatalogRepository(),
         mediaPicker: picker,
       ),
     );
@@ -207,10 +210,47 @@ void main() {
     expect(find.text('0/2 file'), findsOneWidget);
   });
 
+  testWidgets('image limit follows backend maximum of 5 MB', (tester) async {
+    final picker = _FakeMediaPicker([
+      const [
+        DamageAttachmentCandidate(
+          name: 'foto-besar.jpg',
+          sizeBytes: 6 * 1024 * 1024,
+          kind: DamageAttachmentKind.image,
+        ),
+      ],
+    ]);
+    await tester.pumpWidget(reportApp(picker));
+    await tester.ensureVisible(find.byKey(const Key('add_attachment')));
+    await tester.tap(find.byKey(const Key('add_attachment')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('source_gallery')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'foto-besar.jpg lebih dari 5 MB. Pilih foto yang lebih kecil, ya.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('0/2 file'), findsOneWidget);
+  });
+
   testWidgets('submit enables when all mandatory information is valid', (
     tester,
   ) async {
-    await tester.pumpWidget(reportApp(_FakeMediaPicker()));
+    final picker = _FakeMediaPicker([
+      const [
+        DamageAttachmentCandidate(
+          name: 'bukti.jpg',
+          sizeBytes: 1024,
+          kind: DamageAttachmentKind.image,
+          path: 'bukti.jpg',
+        ),
+      ],
+    ]);
+    final repository = TestServiceCatalogRepository();
+    await tester.pumpWidget(reportApp(picker, repository: repository));
 
     ElevatedButton submitButton() => tester.widget<ElevatedButton>(
       find.byKey(const Key('submit_damage_report')),
@@ -239,13 +279,28 @@ void main() {
       find.byKey(const Key('damage_phone_field')),
       '081234567890',
     );
-    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('add_attachment')));
+    await tester.tap(find.byKey(const Key('add_attachment')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('source_gallery')));
+    await tester.pumpAndSettle();
 
     expect(submitButton().onPressed, isNotNull);
 
     await tester.tap(find.byKey(const Key('submit_damage_report')));
     await tester.pump();
     expect(find.text('Laporan kerusakan berhasil dikirim.'), findsOneWidget);
+    expect(repository.damageSubmitCalls, 1);
+    final submission = repository.submittedDamage;
+    expect(submission?.location, 'Gedung 2, Lantai 3');
+    expect(submission?.damageType, 'AC Ruang Rapat');
+    expect(submission?.categoryCode, 'KRN-AIR');
+    expect(
+      submission?.description,
+      'AC tidak mengeluarkan udara dingin dan terdengar suara keras.',
+    );
+    expect(submission?.contact, '081234567890');
+    expect(submission?.attachments.single.name, 'bukti.jpg');
   });
 
   testWidgets('report header and first fields fit a compact phone', (
