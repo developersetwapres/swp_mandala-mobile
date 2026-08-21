@@ -115,18 +115,20 @@ class OfficeSupplySubmissionItem {
     required this.name,
     required this.unit,
     required this.requested,
+    required this.isCustom,
   });
 
   final int? id;
   final String name;
   final String unit;
   final int requested;
+  final bool isCustom;
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'satuan': unit,
-    'status': 'normal',
+    'status': isCustom ? 'custom' : 'normal',
     'requested': requested,
     'approved': 0,
   };

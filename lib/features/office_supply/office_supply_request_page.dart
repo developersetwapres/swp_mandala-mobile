@@ -482,6 +482,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
                   name: item.name,
                   unit: item.unit,
                   requested: item.quantity,
+                  isCustom: item.isCustom,
                 ),
               )
               .toList(growable: false),

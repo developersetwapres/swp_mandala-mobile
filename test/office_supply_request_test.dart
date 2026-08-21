@@ -347,7 +347,7 @@ void main() {
       'id': null,
       'name': 'Label Printer',
       'satuan': 'Roll',
-      'status': 'normal',
+      'status': 'custom',
       'requested': 4,
       'approved': 0,
     });
