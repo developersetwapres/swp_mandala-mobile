@@ -38,11 +38,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _handleAuthEvent() {
     if (!mounted) return;
-    final controller = AuthScope.of(context);
-    if (controller.logoutError != null) {
+    final controller = _authController;
+    final message = controller?.logoutError;
+    if (controller != null && message != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(controller.logoutError!),
+          content: Text(message),
           backgroundColor: AppColors.coral,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(20),
@@ -121,14 +122,22 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _confirmLogout(BuildContext context) {
+    // Resolve dependencies while the page context is still active. The bottom
+    // sheet context becomes invalid as soon as it is popped.
+    final auth = AuthScope.of(context);
+    final navigator = Navigator.of(context);
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _LogoutConfirmationSheet(
+      builder: (sheetContext) => _LogoutConfirmationSheet(
         onConfirm: () async {
-          Navigator.of(context).pop();
-          await AuthScope.of(context).logout();
+          Navigator.of(sheetContext).pop();
+          await auth.logout();
+
+          if (!mounted || auth.status != AuthStatus.unauthenticated) return;
+          navigator.popUntil((route) => route.isFirst);
         },
       ),
     );
@@ -341,6 +350,7 @@ class _LogoutButton extends StatelessWidget {
       color: AppColors.coralSoft.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
+        key: const Key('profile-logout'),
         onTap: onTap,
         borderRadius: BorderRadius.circular(22),
         child: Container(
@@ -468,6 +478,7 @@ class _LogoutConfirmationSheet extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: ElevatedButton(
+                  key: const Key('profile-logout-confirm'),
                   onPressed: onConfirm,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.coral,

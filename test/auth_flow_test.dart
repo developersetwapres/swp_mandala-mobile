@@ -22,8 +22,10 @@ class _FakeAuthRepository implements AuthRepository {
   String? storedToken;
   AuthFailure? loginFailure;
   AuthFailure? currentUserFailure;
+  AuthFailure? logoutFailure;
   int loginCalls = 0;
   int currentUserCalls = 0;
+  int logoutCalls = 0;
   int clearCalls = 0;
 
   @override
@@ -50,6 +52,14 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<String?> readStoredToken() async => storedToken;
+
+  @override
+  Future<void> logout() async {
+    logoutCalls += 1;
+    if (logoutFailure case final failure?) throw failure;
+    clearCalls += 1;
+    storedToken = null;
+  }
 
   @override
   Future<void> clearSession() async {
@@ -161,6 +171,29 @@ void main() {
     expect(repository.currentUserCalls, 1);
     expect(controller.status, AuthStatus.authenticated);
     expect(find.text('IT Setwapres'), findsOneWidget);
+  });
+
+  testWidgets('logout from profile closes routes and returns to login', (
+    tester,
+  ) async {
+    final repository = _FakeAuthRepository()..storedToken = 'stored-token';
+    final controller = await _pumpAuthApp(tester, repository);
+
+    await tester.tap(find.byKey(const Key('nav_profile')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-logout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-logout-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(repository.logoutCalls, 1);
+    expect(repository.storedToken, isNull);
+    expect(controller.status, AuthStatus.unauthenticated);
+    expect(find.byKey(const Key('login-submit')), findsOneWidget);
+    expect(find.text('Informasi Akun'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('invalid stored token is cleared and returns to login', (
