@@ -9,6 +9,8 @@ abstract interface class AuthRepository {
 
   Future<AppUser> getCurrentUser();
 
+  Future<void> logout();
+
   Future<String?> readStoredToken();
 
   Future<void> clearSession();

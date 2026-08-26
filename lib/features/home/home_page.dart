@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/domain/app_user.dart';
+import '../auth/presentation/profile_page.dart';
 import '../damage_report/damage_report_page.dart';
 import '../history/domain/history_repository.dart';
 import '../history/presentation/history_page.dart';
@@ -159,9 +160,10 @@ class HomePage extends StatelessWidget {
                 ),
               );
             } else if (index == 2) {
-              _showMessage(
-                context,
-                'Profil akan tersedia pada tahap berikutnya.',
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => ProfilePage(user: user),
+                ),
               );
             }
           },

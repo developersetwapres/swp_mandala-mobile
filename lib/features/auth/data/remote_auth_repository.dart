@@ -91,6 +91,28 @@ class RemoteAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> logout() async {
+    try {
+      await _apiClient.post('auth/logout', authenticated: true);
+      await _tokenStorage.clearToken();
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await _tokenStorage.clearToken();
+        return;
+      }
+      throw const AuthFailure(
+        AuthFailureType.server,
+        'Gagal keluar dari akun. Silakan coba lagi.',
+      );
+    } catch (_) {
+      throw const AuthFailure(
+        AuthFailureType.server,
+        'Gagal keluar dari akun. Silakan coba lagi.',
+      );
+    }
+  }
+
+  @override
   Future<String?> readStoredToken() => _tokenStorage.readToken();
 
   @override

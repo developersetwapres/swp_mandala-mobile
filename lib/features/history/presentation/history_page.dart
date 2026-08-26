@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/presentation/auth_scope.dart';
+import '../../auth/presentation/profile_page.dart';
 import '../../home/primary_navigation_bar.dart';
 import '../domain/history_entry.dart';
 import '../domain/history_failure.dart';
@@ -149,16 +150,13 @@ class _HistoryPageState extends State<HistoryPage> {
             if (index == 0 && Navigator.of(context).canPop()) {
               Navigator.of(context).pop();
             } else if (index == 2) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Profil akan tersedia pada tahap berikutnya.',
-                    ),
-                    margin: EdgeInsets.all(20),
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => ProfilePage(
+                    user: AuthScope.of(context).currentUser!,
                   ),
-                );
+                ),
+              );
             }
           },
         ),

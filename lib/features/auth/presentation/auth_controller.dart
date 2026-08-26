@@ -20,13 +20,17 @@ class AuthController extends ChangeNotifier {
   AppUser? _currentUser;
   String? _loginError;
   String? _sessionError;
+  String? _logoutError;
   bool _isLoggingIn = false;
+  bool _isLoggingOut = false;
 
   AuthStatus get status => _status;
   AppUser? get currentUser => _currentUser;
   String? get loginError => _loginError;
   String? get sessionError => _sessionError;
+  String? get logoutError => _logoutError;
   bool get isLoggingIn => _isLoggingIn;
+  bool get isLoggingOut => _isLoggingOut;
 
   Future<void> initialize() async {
     _status = AuthStatus.checkingSession;
@@ -96,11 +100,30 @@ class AuthController extends ChangeNotifier {
   Future<void> retrySessionCheck() => initialize();
 
   Future<void> logout() async {
-    await _clearSessionQuietly();
-    _currentUser = null;
-    _loginError = null;
-    _sessionError = null;
-    _status = AuthStatus.unauthenticated;
+    if (_isLoggingOut) return;
+
+    _isLoggingOut = true;
+    _logoutError = null;
+    notifyListeners();
+
+    try {
+      await _repository.logout();
+      _currentUser = null;
+      _loginError = null;
+      _sessionError = null;
+      _status = AuthStatus.unauthenticated;
+    } on AuthFailure catch (failure) {
+      _logoutError = failure.message;
+    } catch (_) {
+      _logoutError = 'Tidak dapat keluar saat ini. Silakan coba lagi.';
+    } finally {
+      _isLoggingOut = false;
+      notifyListeners();
+    }
+  }
+
+  void clearLogoutError() {
+    _logoutError = null;
     notifyListeners();
   }
 
