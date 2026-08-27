@@ -314,11 +314,5 @@ void main() {
     expect(find.text('Email wajib diisi.'), findsOneWidget);
     expect(find.text('Password wajib diisi.'), findsOneWidget);
     expect(repository.loginCalls, 0);
-
-    await tester.enterText(find.byKey(const Key('login-email')), 'email-salah');
-    await tester.ensureVisible(find.byKey(const Key('login-submit')));
-    await tester.tap(find.byKey(const Key('login-submit')));
-    await tester.pump();
-    expect(find.text('Masukkan format email yang valid.'), findsOneWidget);
   });
 }

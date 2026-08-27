@@ -1,5 +1,12 @@
 # swp_mandala_mobile
 
+## Runtime configuration
+
+Set `API_BASE_URL` for the Mandala API. If attachment URLs returned by the
+development API use an address that mobile devices cannot reach (for example
+`0.0.0.0`), set `MEDIA_BASE_URL` to the reachable server origin. Attachment
+paths remain unchanged and URL rewriting stays centralized.
+
 A new Flutter project.
 
 ## Getting Started

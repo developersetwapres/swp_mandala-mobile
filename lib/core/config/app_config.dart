@@ -8,4 +8,9 @@ abstract final class AppConfig {
     'API_BASE_URL',
     defaultValue: 'http://src.test/api',
   );
+
+  static const String mediaBaseUrl = String.fromEnvironment(
+    'MEDIA_BASE_URL',
+    defaultValue: '',
+  );
 }

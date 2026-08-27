@@ -11,6 +11,8 @@ import '../domain/history_entry.dart';
 import '../domain/history_failure.dart';
 import '../domain/history_repository.dart';
 import 'history_controller.dart';
+import 'history_detail_page.dart';
+import 'history_presentation.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({required this.repository, super.key});
@@ -152,9 +154,8 @@ class _HistoryPageState extends State<HistoryPage> {
             } else if (index == 2) {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (context) => ProfilePage(
-                    user: AuthScope.of(context).currentUser!,
-                  ),
+                  builder: (context) =>
+                      ProfilePage(user: AuthScope.of(context).currentUser!),
                 ),
               );
             }
@@ -209,6 +210,8 @@ class _HistoryPageState extends State<HistoryPage> {
           itemBuilder: (context, index) => _HistoryCard(
             key: Key('history_item_$index'),
             entry: _controller.visibleEntries[index],
+            detailActionKey: Key('history_detail_action_$index'),
+            onDetail: () => _openDetail(_controller.visibleEntries[index]),
           ),
           separatorBuilder: (_, _) => const SizedBox(height: 12),
         ),
@@ -222,6 +225,14 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
       ),
     ];
+  }
+
+  Future<void> _openDetail(HistoryEntry entry) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => HistoryDetailPage(entry: entry),
+      ),
+    );
   }
 }
 
@@ -404,14 +415,20 @@ class _HistoryControls extends StatelessWidget {
 }
 
 class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.entry, super.key});
+  const _HistoryCard({
+    required this.entry,
+    required this.detailActionKey,
+    required this.onDetail,
+    super.key,
+  });
 
   final HistoryEntry entry;
+  final Key detailActionKey;
+  final VoidCallback onDetail;
 
   @override
   Widget build(BuildContext context) {
-    final typeStyle = _TypeStyle.forType(entry.serviceType);
-    final statusStyle = _StatusStyle.from(entry.status);
+    final typeStyle = HistoryTypeVisual.forType(entry.serviceType);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -492,21 +509,7 @@ class _HistoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: statusStyle.background,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  _humanize(entry.status),
-                  style: Theme.of(context).textTheme.labelMedium
-                      ?.copyWith(color: statusStyle.foreground, fontSize: 10.5),
-                ),
-              ),
+              HistoryStatusBadge(status: entry.status),
             ],
           ),
           const SizedBox(height: 14),
@@ -536,10 +539,37 @@ class _HistoryCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  _formatDate(entry.createdAt),
+                  formatHistoryDate(entry.createdAt),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              InkWell(
+                key: detailActionKey,
+                onTap: onDetail,
+                borderRadius: BorderRadius.circular(999),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Detail',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: AppColors.primaryStrong),
+                      ),
+                      const SizedBox(width: 3),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppColors.primaryStrong,
+                        size: 15,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -779,97 +809,4 @@ class _StatePanel extends StatelessWidget {
       ),
     );
   }
-}
-
-class _TypeStyle {
-  const _TypeStyle(this.icon, this.foreground, this.background);
-
-  final IconData icon;
-  final Color foreground;
-  final Color background;
-
-  factory _TypeStyle.forType(HistoryServiceType type) => switch (type) {
-    HistoryServiceType.meetingRoom => const _TypeStyle(
-      Icons.meeting_room_outlined,
-      AppColors.primaryStrong,
-      AppColors.primarySoft,
-    ),
-    HistoryServiceType.officeSupply => const _TypeStyle(
-      Icons.edit_note_rounded,
-      AppColors.lavender,
-      AppColors.lavenderSoft,
-    ),
-    HistoryServiceType.damage => const _TypeStyle(
-      Icons.home_repair_service_outlined,
-      AppColors.coral,
-      AppColors.coralSoft,
-    ),
-    HistoryServiceType.unknown => const _TypeStyle(
-      Icons.assignment_outlined,
-      AppColors.inkSoft,
-      AppColors.primaryPale,
-    ),
-  };
-}
-
-class _StatusStyle {
-  const _StatusStyle(this.foreground, this.background);
-
-  final Color foreground;
-  final Color background;
-
-  factory _StatusStyle.from(String raw) {
-    switch (raw.trim().toLowerCase()) {
-      case 'pending':
-      case 'waiting':
-      case 'diproses':
-        return const _StatusStyle(AppColors.amber, AppColors.amberSoft);
-      case 'booked':
-        return const _StatusStyle(AppColors.primaryDeep, AppColors.primarySoft);
-      case 'approved':
-      case 'completed':
-      case 'selesai':
-        return const _StatusStyle(AppColors.mint, AppColors.mintSoft);
-      case 'rejected':
-      case 'cancelled':
-      case 'ditolak':
-        return const _StatusStyle(AppColors.coral, AppColors.coralSoft);
-      default:
-        return const _StatusStyle(AppColors.inkSoft, AppColors.primaryPale);
-    }
-  }
-}
-
-String _formatDate(DateTime? value) {
-  if (value == null) return 'Tanggal tidak tersedia';
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'Mei',
-    'Jun',
-    'Jul',
-    'Agu',
-    'Sep',
-    'Okt',
-    'Nov',
-    'Des',
-  ];
-  final local = value.toLocal();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '${local.day} ${months[local.month - 1]} ${local.year} · $hour:$minute';
-}
-
-String _humanize(String raw) {
-  final clean = raw.trim().replaceAll(RegExp(r'[_-]+'), ' ');
-  if (clean.isEmpty || clean.toLowerCase() == 'unknown') return 'Lainnya';
-  return clean
-      .split(' ')
-      .where((word) => word.isNotEmpty)
-      .map(
-        (word) => '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
-      )
-      .join(' ');
 }
