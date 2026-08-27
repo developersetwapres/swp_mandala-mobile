@@ -192,7 +192,7 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  user.email,
+                  user.email ?? 'Email belum tersedia',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.primaryDeep.withValues(alpha: 0.7),

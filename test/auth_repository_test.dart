@@ -40,7 +40,7 @@ void main() {
             'data': {
               'user': {
                 'id': 1,
-                'email': 'it@set.wapresri.go.id',
+                'email': null,
                 'name': 'IT Setwapres',
                 'unit_kerja': 'Biro Tata Usaha dan Sumber Daya Manusia',
               },
@@ -66,6 +66,7 @@ void main() {
       );
 
       expect(response.user.name, 'IT Setwapres');
+      expect(response.user.email, isNull);
       expect(storage.token, 'returned-token');
     },
   );

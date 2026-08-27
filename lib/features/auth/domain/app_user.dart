@@ -7,7 +7,7 @@ class AppUser {
   });
 
   final int id;
-  final String email;
+  final String? email;
   final String name;
   final String unitKerja;
 
@@ -31,7 +31,7 @@ class AppUser {
     final unitKerja = json['unit_kerja'];
 
     if (idValue is! num ||
-        email is! String ||
+        (email != null && email is! String) ||
         name is! String ||
         unitKerja is! String) {
       throw const FormatException('Invalid user payload.');
