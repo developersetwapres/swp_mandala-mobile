@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/domain/app_user.dart';
+import '../auth/presentation/auth_scope.dart';
 import '../auth/presentation/profile_page.dart';
 import '../damage_report/damage_report_page.dart';
+import '../history/domain/history_entry.dart';
+import '../history/domain/history_failure.dart';
 import '../history/domain/history_repository.dart';
 import '../history/presentation/history_page.dart';
 import '../meeting_room/meeting_room_booking_page.dart';
@@ -13,7 +16,7 @@ import '../service_catalog/domain/service_catalog_repository.dart';
 import 'home_models.dart';
 import 'primary_navigation_bar.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({
     required this.user,
     required this.serviceCatalogRepository,
@@ -24,6 +27,9 @@ class HomePage extends StatelessWidget {
   final AppUser user;
   final ServiceCatalogRepository serviceCatalogRepository;
   final HistoryRepository historyRepository;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
 
   static const List<ServiceItem> _services = [
     ServiceItem(
@@ -55,42 +61,64 @@ class HomePage extends StatelessWidget {
       softColor: AppColors.mintSoft,
     ),
   ];
+}
 
-  static const List<ActivityItem> _activities = [
-    ActivityItem(
-      code: 'RRG-2026-001',
-      date: '19 Agustus 2026',
-      service: 'Pemesanan Ruang Rapat',
-      title: 'Koordinasi program kerja',
-      summary: 'Ruang Cendana · 09.00–11.00',
-      status: 'Dipesan',
-      statusColor: AppColors.primaryDeep,
-      statusBackground: AppColors.primarySoft,
-      icon: Icons.meeting_room_outlined,
-    ),
-    ActivityItem(
-      code: 'ATK-2026-014',
-      date: '16 Agustus 2026',
-      service: 'Permintaan Alat Tulis Kantor',
-      title: 'Keperluan administrasi bulanan',
-      summary: 'Paket perlengkapan operasional',
-      status: 'Diproses',
-      statusColor: AppColors.amber,
-      statusBackground: AppColors.amberSoft,
-      icon: Icons.edit_note_rounded,
-    ),
-    ActivityItem(
-      code: 'SRP-2026-009',
-      date: '14 Agustus 2026',
-      service: 'Laporan Kerusakan Sarpras',
-      title: 'Lampu ruang arsip',
-      summary: 'Pencahayaan tidak menyala sejak pagi',
-      status: 'Selesai',
-      statusColor: AppColors.mint,
-      statusBackground: AppColors.mintSoft,
-      icon: Icons.home_repair_service_outlined,
-    ),
-  ];
+class _HomePageState extends State<HomePage> {
+  List<ActivityItem> _recentActivities = const [];
+  bool _loadingActivities = true;
+  String? _activitiesError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentActivities();
+  }
+
+  Future<void> _loadRecentActivities() async {
+    if (mounted) {
+      setState(() {
+        _loadingActivities = true;
+        _activitiesError = null;
+      });
+    }
+    try {
+      final history = await widget.historyRepository.getHistory();
+      final sorted = history.indexed.toList()
+        ..sort((left, right) {
+          final leftDate = left.$2.createdAt;
+          final rightDate = right.$2.createdAt;
+          if (leftDate == null && rightDate == null) {
+            return left.$1.compareTo(right.$1);
+          }
+          if (leftDate == null) return 1;
+          if (rightDate == null) return -1;
+          return rightDate.compareTo(leftDate);
+        });
+      if (!mounted) return;
+      setState(() {
+        _recentActivities = sorted
+            .take(3)
+            .map((item) => _activityFromHistory(item.$2))
+            .toList(growable: false);
+      });
+    } on HistoryFailure catch (failure) {
+      if (!mounted) return;
+      if (failure.type == HistoryFailureType.unauthorized) {
+        await AuthScope.of(context).logout();
+        return;
+      }
+      setState(() => _activitiesError = failure.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _activitiesError =
+              'Aktivitas terbaru belum dapat dimuat. Silakan coba lagi.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingActivities = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,53 +129,55 @@ class HomePage extends StatelessWidget {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        body: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
-            SliverToBoxAdapter(
-              child: _WelcomeHero(
-                user: user,
-                onContact: () => _contactHelpdesk(context),
-              ),
+        body: RefreshIndicator(
+          onRefresh: _loadRecentActivities,
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-            SliverToBoxAdapter(
-              child: _PageContent(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 28),
-                    const _SectionHeader(
-                      title: 'Layanan',
-                      subtitle: 'Pilih kebutuhanmu dengan cepat',
-                      trailing: 'Geser untuk lainnya',
-                    ),
-                    const SizedBox(height: 16),
-                    _ServiceCarousel(
-                      services: _services,
-                      onSelected: (service) => _selectService(context, service),
-                    ),
-                    const SizedBox(height: 34),
-                    const _SectionHeader(
-                      title: 'Aktivitas terbaru',
-                      subtitle: 'Ringkasan permintaan terakhirmu',
-                    ),
-                    const SizedBox(height: 16),
-                    ..._activities.indexed.map(
-                      (entry) => Padding(
-                        padding: EdgeInsets.only(
-                          bottom: entry.$1 == _activities.length - 1 ? 0 : 12,
-                        ),
-                        child: _ActivityCard(activity: entry.$2),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                  ],
+            slivers: [
+              SliverToBoxAdapter(
+                child: _WelcomeHero(
+                  user: widget.user,
+                  onContact: () => _contactHelpdesk(context),
                 ),
               ),
-            ),
-          ],
+              SliverToBoxAdapter(
+                child: _PageContent(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 28),
+                      const _SectionHeader(
+                        title: 'Layanan',
+                        subtitle: 'Pilih kebutuhanmu dengan cepat',
+                        trailing: 'Geser untuk lainnya',
+                      ),
+                      const SizedBox(height: 16),
+                      _ServiceCarousel(
+                        services: HomePage._services,
+                        onSelected: (service) =>
+                            _selectService(context, service),
+                      ),
+                      const SizedBox(height: 34),
+                      const _SectionHeader(
+                        title: 'Aktivitas terbaru',
+                        subtitle: 'Ringkasan permintaan terakhirmu',
+                      ),
+                      const SizedBox(height: 16),
+                      _RecentActivities(
+                        activities: _recentActivities,
+                        loading: _loadingActivities,
+                        error: _activitiesError,
+                        onRetry: _loadRecentActivities,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         bottomNavigationBar: PrimaryNavigationBar(
           selectedIndex: 0,
@@ -156,13 +186,13 @@ class HomePage extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (context) =>
-                      HistoryPage(repository: historyRepository),
+                      HistoryPage(repository: widget.historyRepository),
                 ),
               );
             } else if (index == 2) {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (context) => ProfilePage(user: user),
+                  builder: (context) => ProfilePage(user: widget.user),
                 ),
               );
             }
@@ -176,41 +206,41 @@ class HomePage extends StatelessWidget {
     _showMessage(context, 'Menghubungkan ke Helpdesk Mandala…');
   }
 
-  void _selectService(BuildContext context, ServiceItem service) {
+  Future<void> _selectService(BuildContext context, ServiceItem service) async {
+    String? successMessage;
     if (service.name == 'Pemesanan Ruang Rapat') {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
+      successMessage = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
           builder: (context) => MeetingRoomBookingPage(
-            user: user,
-            repository: serviceCatalogRepository,
+            user: widget.user,
+            repository: widget.serviceCatalogRepository,
           ),
         ),
       );
-      return;
-    }
-    if (service.name == 'Laporan Kerusakan Sarpras') {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
+    } else if (service.name == 'Laporan Kerusakan Sarpras') {
+      successMessage = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
           builder: (context) => DamageReportPage(
-            user: user,
-            repository: serviceCatalogRepository,
+            user: widget.user,
+            repository: widget.serviceCatalogRepository,
           ),
         ),
       );
-      return;
-    }
-    if (service.name == 'Permintaan ATK') {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
+    } else if (service.name == 'Permintaan ATK') {
+      successMessage = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
           builder: (context) => OfficeSupplyRequestPage(
-            user: user,
-            repository: serviceCatalogRepository,
+            user: widget.user,
+            repository: widget.serviceCatalogRepository,
           ),
         ),
       );
-      return;
+    } else {
+      _showMessage(context, '${service.name} dipilih');
     }
-    _showMessage(context, '${service.name} dipilih');
+    if (!context.mounted || successMessage == null) return;
+    _showMessage(context, successMessage);
+    await _loadRecentActivities();
   }
 
   void _showMessage(BuildContext context, String message) {
@@ -655,6 +685,101 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
+class _RecentActivities extends StatelessWidget {
+  const _RecentActivities({
+    required this.activities,
+    required this.loading,
+    required this.error,
+    required this.onRetry,
+  });
+
+  final List<ActivityItem> activities;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && activities.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 28),
+          child: CircularProgressIndicator(
+            key: Key('recent-activities-loading'),
+            strokeWidth: 2.4,
+          ),
+        ),
+      );
+    }
+    if (error != null && activities.isEmpty) {
+      return Container(
+        key: const Key('recent-activities-error'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.coralSoft,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.cloud_off_outlined, color: AppColors.coral),
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Coba lagi'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (activities.isEmpty) {
+      return Container(
+        key: const Key('recent-activities-empty'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.history_toggle_off_rounded,
+              color: AppColors.inkMuted,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Belum ada aktivitas layanan.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      key: const Key('recent-activities-list'),
+      children: activities.indexed
+          .map(
+            (entry) => Padding(
+              padding: EdgeInsets.only(
+                bottom: entry.$1 == activities.length - 1 ? 0 : 12,
+              ),
+              child: _ActivityCard(activity: entry.$2),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
 class _ActivityCard extends StatelessWidget {
   const _ActivityCard({required this.activity});
 
@@ -752,6 +877,99 @@ class _ActivityCard extends StatelessWidget {
       ),
     );
   }
+}
+
+ActivityItem _activityFromHistory(HistoryEntry entry) {
+  final statusStyle = _ActivityStatusStyle.from(entry.status);
+  return ActivityItem(
+    code: entry.code,
+    date: _formatActivityDate(entry.createdAt),
+    service: _serviceLabel(entry),
+    title: entry.displayTitle,
+    summary: entry.compactSummary ?? 'Detail pengajuan tidak tersedia.',
+    status: _humanizeActivityStatus(entry.status),
+    statusColor: statusStyle.foreground,
+    statusBackground: statusStyle.background,
+    icon: switch (entry.serviceType) {
+      HistoryServiceType.meetingRoom => Icons.meeting_room_outlined,
+      HistoryServiceType.officeSupply => Icons.edit_note_rounded,
+      HistoryServiceType.damage => Icons.home_repair_service_outlined,
+      HistoryServiceType.unknown => Icons.assignment_outlined,
+    },
+  );
+}
+
+String _serviceLabel(HistoryEntry entry) => switch (entry.serviceType) {
+  HistoryServiceType.meetingRoom => 'Pemesanan Ruang Rapat',
+  HistoryServiceType.officeSupply => 'Permintaan Alat Tulis Kantor',
+  HistoryServiceType.damage => 'Laporan Kerusakan Sarpras',
+  HistoryServiceType.unknown => entry.typeLabel,
+};
+
+class _ActivityStatusStyle {
+  const _ActivityStatusStyle(this.foreground, this.background);
+
+  final Color foreground;
+  final Color background;
+
+  factory _ActivityStatusStyle.from(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'pending':
+      case 'waiting':
+      case 'diproses':
+        return const _ActivityStatusStyle(AppColors.amber, AppColors.amberSoft);
+      case 'booked':
+        return const _ActivityStatusStyle(
+          AppColors.primaryDeep,
+          AppColors.primarySoft,
+        );
+      case 'approved':
+      case 'completed':
+      case 'selesai':
+        return const _ActivityStatusStyle(AppColors.mint, AppColors.mintSoft);
+      case 'rejected':
+      case 'cancelled':
+      case 'ditolak':
+        return const _ActivityStatusStyle(AppColors.coral, AppColors.coralSoft);
+      default:
+        return const _ActivityStatusStyle(
+          AppColors.inkSoft,
+          AppColors.primaryPale,
+        );
+    }
+  }
+}
+
+String _formatActivityDate(DateTime? value) {
+  if (value == null) return 'Tanggal tidak tersedia';
+  const months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+  final local = value.toLocal();
+  return '${local.day} ${months[local.month - 1]} ${local.year}';
+}
+
+String _humanizeActivityStatus(String raw) {
+  final clean = raw.trim().replaceAll(RegExp(r'[_-]+'), ' ');
+  if (clean.isEmpty || clean.toLowerCase() == 'unknown') return 'Lainnya';
+  return clean
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .map(
+        (word) => '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+      )
+      .join(' ');
 }
 
 class _PageContent extends StatelessWidget {

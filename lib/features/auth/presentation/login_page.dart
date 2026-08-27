@@ -20,6 +20,14 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.controller.checkServerConnection();
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -47,13 +55,15 @@ class _LoginPageState extends State<LoginPage> {
           child: SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 28, 20, 30),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
                   child: Column(
                     children: [
                       const _LoginHero(),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 10),
+                      _ServerConnectionBadge(controller: widget.controller),
+                      const SizedBox(height: 14),
                       _LoginCard(
                         formKey: _formKey,
                         emailController: _emailController,
@@ -110,43 +120,118 @@ class _LoginHero extends StatelessWidget {
         Column(
           children: [
             Container(
-              width: 76,
-              height: 76,
+              width: 120,
+              height: 80,
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.primary, AppColors.primaryStrong],
-                ),
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white.withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: const [
                   BoxShadow(
-                    color: Color(0x3050AEDA),
+                    color: Color(0x2450AEDA),
                     blurRadius: 24,
                     offset: Offset(0, 10),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.hub_rounded,
-                color: Colors.white,
-                size: 38,
+              child: Image.asset(
+                'assets/images/logo-p2.png',
+                key: const Key('mandala-logo'),
+                fit: BoxFit.contain,
+                semanticLabel: 'Logo Mandala',
               ),
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Selamat datang',
-              style: Theme.of(context).textTheme.displaySmall,
-            ),
+            const SizedBox(height: 10),
+            Text('MANDALA', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: 7),
             Text(
-              'Masuk ke Mandala untuk mengakses layanan kantor.',
+              'Manajemen Administrasi dan Layanan Dalam Satu Aplikasi',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ServerConnectionBadge extends StatelessWidget {
+  const _ServerConnectionBadge({required this.controller});
+
+  final AuthController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = controller.serverConnectionStatus;
+    final checking = status == ServerConnectionStatus.checking;
+    final connected = status == ServerConnectionStatus.connected;
+    final foreground = checking
+        ? AppColors.inkMuted
+        : connected
+        ? AppColors.mint
+        : AppColors.coral;
+    final background = checking
+        ? AppColors.primaryPale
+        : connected
+        ? AppColors.mintSoft
+        : AppColors.coralSoft;
+    final label = checking
+        ? 'Memeriksa koneksi API server…'
+        : connected
+        ? 'Terhubung ke API server'
+        : 'Gagal terhubung ke API server';
+
+    return Semantics(
+      liveRegion: true,
+      label: label,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          key: const Key('server-connection-status'),
+          onTap: checking ? null : controller.checkServerConnection,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (checking)
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: foreground,
+                    ),
+                  )
+                else
+                  Icon(
+                    connected
+                        ? Icons.cloud_done_outlined
+                        : Icons.cloud_off_outlined,
+                    color: foreground,
+                    size: 17,
+                  ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelMedium
+                        ?.copyWith(color: foreground),
+                  ),
+                ),
+                if (!checking) ...[
+                  const SizedBox(width: 5),
+                  Icon(Icons.refresh_rounded, color: foreground, size: 15),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -224,16 +309,16 @@ class _LoginCard extends StatelessWidget {
                 ],
                 autocorrect: false,
                 decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'nama@instansi.go.id',
+                  labelText: 'Username',
+                  hintText: 'SSO Setneg/ Username',
                   prefixIcon: Icon(Icons.alternate_email_rounded),
                 ),
                 validator: (value) {
                   final email = value?.trim() ?? '';
                   if (email.isEmpty) return 'Email wajib diisi.';
-                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-                    return 'Masukkan format email yang valid.';
-                  }
+                  // if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                  //   return 'Masukkan format email yang valid.';
+                  // }
                   return null;
                 },
               ),

@@ -11,6 +11,8 @@ enum AuthStatus {
   sessionCheckFailed,
 }
 
+enum ServerConnectionStatus { checking, connected, disconnected }
+
 class AuthController extends ChangeNotifier {
   AuthController(this._repository);
 
@@ -23,6 +25,9 @@ class AuthController extends ChangeNotifier {
   String? _logoutError;
   bool _isLoggingIn = false;
   bool _isLoggingOut = false;
+  ServerConnectionStatus _serverConnectionStatus =
+      ServerConnectionStatus.checking;
+  bool _isCheckingServer = false;
 
   AuthStatus get status => _status;
   AppUser? get currentUser => _currentUser;
@@ -31,6 +36,25 @@ class AuthController extends ChangeNotifier {
   String? get logoutError => _logoutError;
   bool get isLoggingIn => _isLoggingIn;
   bool get isLoggingOut => _isLoggingOut;
+  ServerConnectionStatus get serverConnectionStatus => _serverConnectionStatus;
+
+  Future<void> checkServerConnection() async {
+    if (_isCheckingServer) return;
+    _isCheckingServer = true;
+    _serverConnectionStatus = ServerConnectionStatus.checking;
+    notifyListeners();
+    try {
+      final connected = await _repository.checkServerConnection();
+      _serverConnectionStatus = connected
+          ? ServerConnectionStatus.connected
+          : ServerConnectionStatus.disconnected;
+    } catch (_) {
+      _serverConnectionStatus = ServerConnectionStatus.disconnected;
+    } finally {
+      _isCheckingServer = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> initialize() async {
     _status = AuthStatus.checkingSession;

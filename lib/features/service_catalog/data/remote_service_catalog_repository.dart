@@ -230,10 +230,13 @@ class RemoteServiceCatalogRepository implements ServiceCatalogRepository {
     required T Function(Map<String, dynamic>) parser,
   }) {
     final data = payload['data'];
-    if (data is! Map<String, dynamic> || data[key] is! List) {
-      throw const FormatException('Invalid service catalog payload.');
-    }
-    final rawItems = data[key] as List;
+    final rawItems = switch (data) {
+      // Current API contract: {"data": [...]}
+      List items => items,
+      // Backward compatibility for the previous keyed response contract.
+      Map<String, dynamic> map when map[key] is List => map[key] as List,
+      _ => throw const FormatException('Invalid service catalog payload.'),
+    };
     final parsed = <T>[];
     for (final rawItem in rawItems) {
       if (rawItem is! Map<String, dynamic>) continue;

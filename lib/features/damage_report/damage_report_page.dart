@@ -511,6 +511,11 @@ class _DamageReportPageState extends State<DamageReportPage> {
         ),
       );
       if (!mounted) return;
+      final successMessage = _successMessage(response);
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(successMessage);
+        return;
+      }
       setState(() {
         _locationController.clear();
         _itemController.clear();
@@ -525,7 +530,7 @@ class _DamageReportPageState extends State<DamageReportPage> {
         _phoneTouched = false;
         _submitFieldErrors = const {};
       });
-      _showSubmitMessage(_successMessage(response), success: true);
+      _showSubmitMessage(successMessage, success: true);
     } on ServiceSubmissionFailure catch (failure) {
       if (!mounted) return;
       if (failure.type == ServiceSubmissionFailureType.unauthorized) {

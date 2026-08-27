@@ -20,6 +20,7 @@ const _apiUser = AppUser(
 
 class _FakeAuthRepository implements AuthRepository {
   String? storedToken;
+  bool serverConnected = true;
   AuthFailure? loginFailure;
   AuthFailure? currentUserFailure;
   AuthFailure? logoutFailure;
@@ -27,6 +28,9 @@ class _FakeAuthRepository implements AuthRepository {
   int currentUserCalls = 0;
   int logoutCalls = 0;
   int clearCalls = 0;
+
+  @override
+  Future<bool> checkServerConnection() async => serverConnected;
 
   @override
   Future<LoginResponse> login({
@@ -161,6 +165,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('login shows Mandala identity and live API connection status', (
+    tester,
+  ) async {
+    final repository = _FakeAuthRepository();
+    await _pumpAuthApp(tester, repository);
+
+    expect(find.byKey(const Key('mandala-logo')), findsOneWidget);
+    expect(find.text('MANDALA'), findsOneWidget);
+    expect(
+      find.text('Manajemen Administrasi dan Layanan Dalam Satu Aplikasi'),
+      findsOneWidget,
+    );
+    expect(find.text('Terhubung ke API server'), findsOneWidget);
+
+    repository.serverConnected = false;
+    await tester.tap(find.byKey(const Key('server-connection-status')));
+    await tester.pumpAndSettle();
+    expect(find.text('Gagal terhubung ke API server'), findsOneWidget);
+  });
+
   testWidgets('app restart validates a stored token before opening home', (
     tester,
   ) async {
@@ -249,34 +273,33 @@ void main() {
     },
   );
 
-  testWidgets('401 from History clears auth and returns to login', (
-    tester,
-  ) async {
-    final authRepository = _FakeAuthRepository()..storedToken = 'stored-token';
-    final historyRepository = TestHistoryRepository(
-      error: const HistoryFailure(
-        HistoryFailureType.unauthorized,
-        'Unauthenticated.',
-      ),
-    );
-    final controller = await _pumpAuthApp(
-      tester,
-      authRepository,
-      historyRepository: historyRepository,
-    );
+  testWidgets(
+    '401 while loading Home history clears auth and returns to login',
+    (tester) async {
+      final authRepository = _FakeAuthRepository()
+        ..storedToken = 'stored-token';
+      final historyRepository = TestHistoryRepository(
+        error: const HistoryFailure(
+          HistoryFailureType.unauthorized,
+          'Unauthenticated.',
+        ),
+      );
+      final controller = await _pumpAuthApp(
+        tester,
+        authRepository,
+        historyRepository: historyRepository,
+      );
 
-    await tester.tap(find.byKey(const Key('nav_history')));
-    await tester.pumpAndSettle();
-
-    expect(historyRepository.calls, 1);
-    expect(authRepository.clearCalls, 1);
-    expect(controller.status, AuthStatus.unauthenticated);
-    expect(find.byKey(const Key('login-submit')), findsOneWidget);
-    expect(
-      find.text('Pantau perjalanan seluruh pengajuan layananmu.'),
-      findsNothing,
-    );
-  });
+      expect(historyRepository.calls, 1);
+      expect(authRepository.clearCalls, 1);
+      expect(controller.status, AuthStatus.unauthenticated);
+      expect(find.byKey(const Key('login-submit')), findsOneWidget);
+      expect(
+        find.text('Pantau perjalanan seluruh pengajuan layananmu.'),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('login validates email and password before sending a request', (
     tester,
@@ -284,6 +307,7 @@ void main() {
     final repository = _FakeAuthRepository();
     await _pumpAuthApp(tester, repository);
 
+    await tester.ensureVisible(find.byKey(const Key('login-submit')));
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pump();
 
@@ -292,6 +316,7 @@ void main() {
     expect(repository.loginCalls, 0);
 
     await tester.enterText(find.byKey(const Key('login-email')), 'email-salah');
+    await tester.ensureVisible(find.byKey(const Key('login-submit')));
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pump();
     expect(find.text('Masukkan format email yang valid.'), findsOneWidget);

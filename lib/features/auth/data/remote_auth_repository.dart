@@ -17,6 +17,16 @@ class RemoteAuthRepository implements AuthRepository {
   final TokenStorage _tokenStorage;
 
   @override
+  Future<bool> checkServerConnection() async {
+    try {
+      final payload = await _apiClient.get('/');
+      return payload['message'] is String;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
   Future<LoginResponse> login({
     required String email,
     required String password,

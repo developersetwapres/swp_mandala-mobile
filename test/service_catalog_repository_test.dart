@@ -52,26 +52,24 @@ void main() {
         });
         return http.Response(
           jsonEncode({
-            'data': {
-              'availableRoom': [
-                {
-                  'id': 'RPT-ISYWN',
-                  'nama_ruangan': 'Ruang Rapat Enggano',
-                  'kode_ruangan': 'RPT-ISYWN',
-                  'kapasitas': '34+1',
-                  'kapasitas_max': '50+1',
-                  'lokasi': 'Gedung Sekretariat II Lantai 1',
-                  'status': 'booked',
-                  'bookedSlots': ['09:00 - 15:00', '16:00 - 17:00'],
-                  'image': 'http://src.test/files/room.jpg',
-                  'image_desc': 'http://src.test/files/island.png',
-                  'lokasi_desc': 'Pulau Enggano, Bengkulu',
-                  'deskripsi': 'Permata terluar Indonesia.',
-                  'facilities': ['tv-led', 'kamera'],
-                  'bookedByBiro': ['Biro A', 'Biro B'],
-                },
-              ],
-            },
+            'data': [
+              {
+                'id': 'RPT-ISYWN',
+                'nama_ruangan': 'Ruang Rapat Enggano',
+                'kode_ruangan': 'RPT-ISYWN',
+                'kapasitas': '34+1',
+                'kapasitas_max': '50+1',
+                'lokasi': 'Gedung Sekretariat II Lantai 1',
+                'status': 'booked',
+                'bookedSlots': ['09:00 - 15:00', '16:00 - 17:00'],
+                'image': 'http://src.test/files/room.jpg',
+                'image_desc': 'http://src.test/files/island.png',
+                'lokasi_desc': 'Pulau Enggano, Bengkulu',
+                'deskripsi': 'Permata terluar Indonesia.',
+                'facilities': ['tv-led', 'kamera'],
+                'bookedByBiro': ['Biro A', 'Biro B'],
+              },
+            ],
           }),
           200,
         );
@@ -105,17 +103,15 @@ void main() {
       requestCount += 1;
       return http.Response(
         jsonEncode({
-          'data': {
-            'availableATK': [
-              {
-                'id': 353,
-                'name': 'Amplop Coklat A3',
-                'satuan': 'Buah',
-                'kategori_atk_id': 36,
-                'kategori_atk': {'id': 36, 'nama_kategori': 'AMPLOP'},
-              },
-            ],
-          },
+          'data': [
+            {
+              'id': 353,
+              'name': 'Amplop Coklat A3',
+              'satuan': 'Buah',
+              'kategori_atk_id': 36,
+              'kategori_atk': {'id': 36, 'nama_kategori': 'AMPLOP'},
+            },
+          ],
         }),
         200,
       );
@@ -136,16 +132,14 @@ void main() {
     final repository = _repository(
       (request) async => http.Response(
         jsonEncode({
-          'data': {
-            'availableKategoriKerusakan': [
-              {
-                'id': 9,
-                'kode_kerusakan': 'KRN-JDV6F',
-                'name': 'Furniture',
-                'sub_kategori': ['Meja', 'Kursi', 'Credenza'],
-              },
-            ],
-          },
+          'data': [
+            {
+              'id': 9,
+              'kode_kerusakan': 'KRN-JDV6F',
+              'name': 'Furniture',
+              'sub_kategori': ['Meja', 'Kursi', 'Credenza'],
+            },
+          ],
         }),
         200,
       ),
@@ -162,12 +156,7 @@ void main() {
     'empty arrays are valid while malformed payload is controlled',
     () async {
       final emptyRepository = _repository(
-        (request) async => http.Response(
-          jsonEncode({
-            'data': {'availableATK': <Object>[]},
-          }),
-          200,
-        ),
+        (request) async => http.Response(jsonEncode({'data': <Object>[]}), 200),
       );
       expect(await emptyRepository.getAvailableOfficeSupplies(), isEmpty);
 
@@ -186,6 +175,30 @@ void main() {
       );
     },
   );
+
+  test('previous keyed data wrapper remains supported', () async {
+    final repository = _repository(
+      (request) async => http.Response(
+        jsonEncode({
+          'data': {
+            'availableKategoriKerusakan': [
+              {
+                'id': 4,
+                'kode_kerusakan': 'KRN-SZ8F4',
+                'name': 'Kelistrikan',
+                'sub_kategori': ['Stop Kontak', 'Lampu Penerangan'],
+              },
+            ],
+          },
+        }),
+        200,
+      ),
+    );
+
+    final categories = await repository.getDamageCategories();
+
+    expect(categories.single.code, 'KRN-SZ8F4');
+  });
 
   test('network, server, and unauthorized failures stay user-safe', () async {
     Future<ServiceCatalogFailure> failureFor(

@@ -491,6 +491,11 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
         ),
       );
       if (!mounted) return;
+      final successMessage = _successMessage(response);
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(successMessage);
+        return;
+      }
       setState(() {
         _requestedItems.clear();
         _noteController.clear();
@@ -498,7 +503,7 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
         _phoneTouched = false;
         _submitFieldErrors = const {};
       });
-      _showSubmitMessage(_successMessage(response), success: true);
+      _showSubmitMessage(successMessage, success: true);
     } on ServiceSubmissionFailure catch (failure) {
       if (!mounted) return;
       if (failure.type == ServiceSubmissionFailureType.unauthorized) {

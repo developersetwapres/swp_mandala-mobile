@@ -593,8 +593,13 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         ),
       );
       if (!mounted) return;
+      final successMessage = _successMessage(response);
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(successMessage);
+        return;
+      }
       _resetAfterSuccess();
-      _showSubmitMessage(_successMessage(response), success: true);
+      _showSubmitMessage(successMessage, success: true);
     } on ServiceSubmissionFailure catch (failure) {
       if (!mounted) return;
       if (failure.type == ServiceSubmissionFailureType.unauthorized) {
