@@ -177,10 +177,10 @@ class _ServerConnectionBadge extends StatelessWidget {
         ? AppColors.mintSoft
         : AppColors.coralSoft;
     final label = checking
-        ? 'Memeriksa koneksi API server…'
+        ? 'Memeriksa koneksi server…'
         : connected
-        ? 'Terhubung ke API server'
-        : 'Gagal terhubung ke API server';
+        ? 'Terhubung ke server'
+        : 'Gagal terhubung ke server';
 
     return Semantics(
       liveRegion: true,

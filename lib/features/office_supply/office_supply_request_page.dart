@@ -478,7 +478,9 @@ class _OfficeSupplyRequestPageState extends State<OfficeSupplyRequestPage> {
           items: _requestedItems
               .map(
                 (item) => OfficeSupplySubmissionItem(
-                  id: item.isCustom ? null : int.tryParse(item.masterId ?? ''),
+                  id: item.isCustom
+                      ? item.masterId
+                      : int.tryParse(item.masterId ?? ''),
                   name: item.name,
                   unit: item.unit,
                   requested: item.quantity,

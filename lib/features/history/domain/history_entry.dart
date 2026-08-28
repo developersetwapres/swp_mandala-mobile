@@ -195,6 +195,8 @@ class HistorySupplyItem {
     required this.status,
     required this.approved,
     required this.requested,
+    required this.originId,
+    required this.replacedBy,
   });
 
   final int? id;
@@ -203,6 +205,8 @@ class HistorySupplyItem {
   final String? status;
   final int? approved;
   final int? requested;
+  final String? originId;
+  final String? replacedBy;
 
   factory HistorySupplyItem.fromJson(Map<String, dynamic> json) =>
       HistorySupplyItem(
@@ -212,6 +216,8 @@ class HistorySupplyItem {
         status: _text(json['status']),
         approved: _integer(json['approved']),
         requested: _integer(json['requested']),
+        originId: _text(json['origin_id']),
+        replacedBy: _text(json['replacedBy']),
       );
 
   String get compactLabel =>

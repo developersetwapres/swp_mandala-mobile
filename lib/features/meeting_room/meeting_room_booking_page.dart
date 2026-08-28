@@ -1271,135 +1271,336 @@ class _RoomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     final statusColor = room.isAvailable ? AppColors.mint : AppColors.coral;
+
     final statusBackground = room.isAvailable
         ? AppColors.mintSoft
         : AppColors.coralSoft;
 
     return AnimatedContainer(
       key: Key('room_${room.id.toLowerCase()}'),
-      duration: const Duration(milliseconds: 190),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: selected ? AppColors.primaryPale : AppColors.surface,
-        borderRadius: BorderRadius.circular(23),
+        color: selected
+            ? AppColors.primaryPale.withValues(alpha: 0.45)
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: selected ? AppColors.primaryStrong : AppColors.line,
-          width: selected ? 1.6 : 1,
+          color: selected
+              ? AppColors.primaryStrong.withValues(alpha: 0.65)
+              : AppColors.line.withValues(alpha: 0.8),
+          width: selected ? 1.5 : 1,
         ),
-        boxShadow: selected
-            ? const [
-                BoxShadow(
-                  color: Color(0x1854BDF2),
-                  blurRadius: 22,
-                  offset: Offset(0, 8),
-                ),
-              ]
-            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: selected ? 0.07 : 0.035),
+            blurRadius: selected ? 24 : 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(23),
-        child: InkWell(
-          onTap: room.isAvailable ? onSelect : null,
-          borderRadius: BorderRadius.circular(23),
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            InkWell(
+              onTap: room.isAvailable ? onSelect : null,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 17, 18, 15),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.primarySoft
-                            : statusBackground,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        selected
-                            ? Icons.check_rounded
-                            : Icons.meeting_room_outlined,
-                        color: selected ? AppColors.primaryStrong : statusColor,
-                        size: 21,
-                      ),
+                    // =====================================================
+                    // HEADER
+                    // =====================================================
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Room icon
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.primarySoft
+                                : statusBackground,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          alignment: Alignment.center,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: Icon(
+                              selected
+                                  ? Icons.check_rounded
+                                  : Icons.meeting_room_outlined,
+                              key: ValueKey(selected),
+                              size: 23,
+                              color: selected
+                                  ? AppColors.primaryStrong
+                                  : statusColor,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 13),
+
+                        // Room name
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Text(
+                              room.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 17,
+                                height: 1.25,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                                letterSpacing: -0.25,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        // Status
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusBackground,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                room.isAvailable ? 'Tersedia' : 'Dipesan',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: statusColor,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
+
+                    const SizedBox(height: 16),
+
+                    // =====================================================
+                    // CAPACITY INFORMATION
+                    // =====================================================
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _RoomInfoChip(
+                          icon: Icons.people_alt_outlined,
+                          text: '${room.capacity} orang',
+                        ),
+                        _RoomInfoChip(
+                          icon: Icons.add_circle_outline_rounded,
+                          text: 'Maks. ${room.maximumCapacityLabel}',
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 13),
+
+                    // =====================================================
+                    // LOCATION
+                    // =====================================================
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 11,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryPale.withValues(alpha: 0.34),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            room.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium,
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 18,
+                            color: AppColors.primaryStrong,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${room.capacity} orang · Maks. ${room.maximumCapacityLabel}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Lokasi',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontSize: 10,
+                                    color: AppColors.inkSoft,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  room.location,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    height: 1.35,
+                                    fontSize: 12.5,
+                                    color: AppColors.ink,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+
+                    // =====================================================
+                    // BOOKED INFORMATION
+                    // =====================================================
+                    if (!room.isAvailable) ...[
+                      const SizedBox(height: 11),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.coralSoft.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: 17,
+                              color: AppColors.coral,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                room.bookedInformation,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  height: 1.4,
+                                  fontSize: 11.5,
+                                  color: AppColors.inkSoft,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // =========================================================
+            // DETAIL ACTION
+            // =========================================================
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 18),
+              color: AppColors.line.withValues(alpha: 0.6),
+            ),
+
+            InkWell(
+              key: Key('detail_${room.id.toLowerCase()}'),
+              onTap: onDetail,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 11, 14, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Lihat detail ruangan',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: AppColors.primaryStrong,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 6,
-                      ),
+                      width: 31,
+                      height: 31,
                       decoration: BoxDecoration(
-                        color: statusBackground,
-                        borderRadius: BorderRadius.circular(999),
+                        color: AppColors.primarySoft.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        room.isAvailable ? 'Tersedia' : 'Telah Dipesan',
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(color: statusColor, fontSize: 10),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 17,
+                        color: AppColors.primaryStrong,
                       ),
                     ),
                   ],
                 ),
-                if (!room.isAvailable) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(11),
-                    decoration: BoxDecoration(
-                      color: AppColors.coralSoft.withValues(alpha: 0.62),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      room.bookedInformation,
-                      style: Theme.of(context).textTheme.bodySmall
-                          ?.copyWith(color: AppColors.inkSoft),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 9),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    key: Key('detail_${room.id.toLowerCase()}'),
-                    onPressed: onDetail,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primaryStrong,
-                      minimumSize: const Size(48, 42),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    iconAlignment: IconAlignment.end,
-                    icon: const Icon(Icons.arrow_outward_rounded, size: 17),
-                    label: const Text('Detail'),
-                  ),
-                ),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomInfoChip extends StatelessWidget {
+  const _RoomInfoChip({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.line.withValues(alpha: 0.75)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppColors.inkSoft),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.inkSoft,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ),
+        ],
       ),
     );
   }

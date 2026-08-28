@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../../damage_report/damage_report_models.dart';
 
 class ServiceSubmitResponse {
@@ -110,15 +112,17 @@ class RoomBookingSubmission {
 }
 
 class OfficeSupplySubmissionItem {
-  const OfficeSupplySubmissionItem({
-    required this.id,
+  OfficeSupplySubmissionItem({
+    required Object? id,
     required this.name,
     required this.unit,
     required this.requested,
     required this.isCustom,
-  });
+  }) : id = isCustom && _missingCustomId(id)
+           ? _generateCustomSupplyItemId()
+           : id;
 
-  final int? id;
+  final Object? id;
   final String name;
   final String unit;
   final int requested;
@@ -132,6 +136,19 @@ class OfficeSupplySubmissionItem {
     'requested': requested,
     'approved': 0,
   };
+}
+
+bool _missingCustomId(Object? value) =>
+    value == null || (value is String && value.trim().isEmpty);
+
+String _generateCustomSupplyItemId() {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  final random = Random.secure();
+  return List.generate(
+    5,
+    (_) => characters[random.nextInt(characters.length)],
+    growable: false,
+  ).join();
 }
 
 class OfficeSupplySubmission {

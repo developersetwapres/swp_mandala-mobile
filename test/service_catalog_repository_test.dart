@@ -283,7 +283,7 @@ void main() {
     expect(response.message, 'Pesan sukses ruang dari backend.');
   });
 
-  test('ATK submit preserves real IDs and nullable custom item ID', () async {
+  test('ATK submit preserves real and generated custom item IDs', () async {
     final repository = _repository((request) async {
       expect(request.method, 'POST');
       expect(request.url.path, '/api/permintaan-atk');
@@ -300,7 +300,7 @@ void main() {
           'approved': 0,
         },
         {
-          'id': null,
+          'id': 'A1B2C',
           'name': 'Label Printer',
           'satuan': 'Roll',
           'status': 'custom',
@@ -315,7 +315,7 @@ void main() {
     });
 
     final response = await repository.submitOfficeSupplyRequest(
-      const OfficeSupplySubmission(
+      OfficeSupplySubmission(
         items: [
           OfficeSupplySubmissionItem(
             id: 353,
@@ -325,7 +325,7 @@ void main() {
             isCustom: false,
           ),
           OfficeSupplySubmissionItem(
-            id: null,
+            id: 'A1B2C',
             name: 'Label Printer',
             unit: 'Roll',
             requested: 5,
@@ -338,6 +338,28 @@ void main() {
     );
 
     expect(response.message, 'Pesan sukses ATK dari backend.');
+  });
+
+  test('custom ATK item normalizes null and blank IDs to five characters', () {
+    final nullId = OfficeSupplySubmissionItem(
+      id: null,
+      name: 'Kertas Cepot',
+      unit: 'lembar',
+      requested: 7,
+      isCustom: true,
+    ).id;
+    final blankId = OfficeSupplySubmissionItem(
+      id: '  ',
+      name: 'Map Khusus',
+      unit: 'buah',
+      requested: 2,
+      isCustom: true,
+    ).id;
+
+    for (final id in [nullId, blankId]) {
+      expect(id, isA<String>());
+      expect(id, matches(RegExp(r'^[A-Z0-9]{5}$')));
+    }
   });
 
   test('damage submit uses authenticated multipart photos array', () async {

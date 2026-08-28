@@ -10,6 +10,7 @@ import '../history/domain/history_entry.dart';
 import '../history/domain/history_failure.dart';
 import '../history/domain/history_repository.dart';
 import '../history/presentation/history_page.dart';
+import '../history/presentation/history_supply_presentation.dart';
 import '../meeting_room/meeting_room_booking_page.dart';
 import '../office_supply/office_supply_request_page.dart';
 import '../service_catalog/domain/service_catalog_repository.dart';
@@ -885,7 +886,7 @@ ActivityItem _activityFromHistory(HistoryEntry entry) {
     code: entry.code,
     date: _formatActivityDate(entry.createdAt),
     service: _serviceLabel(entry),
-    title: entry.displayTitle,
+    title: historyDisplayTitle(entry),
     summary: entry.compactSummary ?? 'Detail pengajuan tidak tersedia.',
     status: _humanizeActivityStatus(entry.status),
     statusColor: statusStyle.foreground,

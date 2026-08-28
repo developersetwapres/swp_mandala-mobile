@@ -5,6 +5,7 @@ import '../../../core/network/media_url_resolver.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/history_entry.dart';
 import 'history_presentation.dart';
+import 'history_supply_presentation.dart';
 
 class HistoryDetailPage extends StatelessWidget {
   const HistoryDetailPage({required this.entry, super.key});
@@ -138,7 +139,7 @@ class _RequestHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  entry.displayTitle,
+                  historyDisplayTitle(entry),
                   key: const Key('history_detail_title'),
                   style: Theme.of(context).textTheme.headlineSmall
                       ?.copyWith(fontSize: 25, height: 1.25),
@@ -276,27 +277,28 @@ class _OfficeSupplyDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final logicalItems = logicalSupplyRequestItems(entry.supplyItems);
     return Column(
       children: [
-        if (entry.supplyItems.isNotEmpty)
+        if (logicalItems.isNotEmpty)
           _DetailSection(
             key: const Key('detail_atk_items'),
             icon: Icons.inventory_2_outlined,
             title: 'Daftar kebutuhan',
-            subtitle: '${entry.supplyItems.length} barang diajukan',
+            subtitle: '${logicalItems.length} barang diajukan',
             child: Column(
-              children: entry.supplyItems.indexed
+              children: logicalItems.indexed
                   .map(
                     (item) => _SupplyItemTile(
                       item: item.$2,
                       index: item.$1,
                       showApproved:
-                          item.$2.approved != null &&
+                          item.$2.approvalItem?.approved != null &&
                           !const {
                             'pending',
                             'waiting',
                           }.contains(entry.status.trim().toLowerCase()),
-                      showDivider: item.$1 < entry.supplyItems.length - 1,
+                      showDivider: item.$1 < logicalItems.length - 1,
                     ),
                   )
                   .toList(growable: false),
@@ -322,18 +324,19 @@ class _SupplyItemTile extends StatelessWidget {
     required this.showDivider,
   });
 
-  final HistorySupplyItem item;
+  final HistorySupplyRequestItem item;
   final int index;
   final bool showApproved;
   final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
-    final custom = item.id == null || item.status?.toLowerCase() == 'custom';
+    final requestedItem = item.requestedItem;
     final requested = [
-      if (item.requested != null) item.requested.toString(),
-      item.unit,
+      if (requestedItem.requested != null) requestedItem.requested.toString(),
+      requestedItem.unit,
     ].whereType<String>().join(' ');
+    final approvalItem = item.approvalItem;
     return Column(
       children: [
         Padding(
@@ -364,12 +367,12 @@ class _SupplyItemTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            item.name,
+                            requestedItem.name,
                             key: Key('detail_atk_item_$index'),
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                         ),
-                        if (custom)
+                        if (item.isCustomRequest)
                           const _TinyTag(
                             label: 'Lain-lain',
                             color: AppColors.lavender,
@@ -380,15 +383,31 @@ class _SupplyItemTile extends StatelessWidget {
                     if (requested.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Diminta $requested',
+                        item.isUnmatchedReplacement
+                            ? 'Jumlah $requested'
+                            : 'Diminta $requested',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
-                    if (showApproved) ...[
+                    if (item.replacementItem case final replacement?) ...[
+                      const SizedBox(height: 7),
+                      _SupplyReplacementSurface(
+                        item: replacement,
+                        showApproved: showApproved,
+                      ),
+                    ] else if (item.isMissingReplacement) ...[
+                      const SizedBox(height: 7),
+                      Text(
+                        'Detail barang pemenuhan belum tersedia.',
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: AppColors.inkMuted),
+                      ),
+                    ] else if (showApproved && approvalItem != null) ...[
                       const SizedBox(height: 7),
                       _TinyTag(
-                        label: 'Disetujui ${item.approved} ${item.unit ?? ''}'
-                            .trim(),
+                        label:
+                            'Disetujui ${approvalItem.approved} ${approvalItem.unit ?? ''}'
+                                .trim(),
                         color: AppColors.mint,
                         background: AppColors.mintSoft,
                       ),
@@ -401,6 +420,63 @@ class _SupplyItemTile extends StatelessWidget {
         ),
         if (showDivider) const Divider(),
       ],
+    );
+  }
+}
+
+class _SupplyReplacementSurface extends StatelessWidget {
+  const _SupplyReplacementSurface({
+    required this.item,
+    required this.showApproved,
+  });
+
+  final HistorySupplyItem item;
+  final bool showApproved;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: AppColors.primaryPale,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primarySoft),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.swap_horiz_rounded,
+            color: AppColors.primaryStrong,
+            size: 19,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dipenuhi dengan',
+                  style: Theme.of(context).textTheme.labelMedium
+                      ?.copyWith(color: AppColors.primaryStrong),
+                ),
+                const SizedBox(height: 2),
+                Text(item.name, style: Theme.of(context).textTheme.titleSmall),
+                if (showApproved) ...[
+                  const SizedBox(height: 7),
+                  _TinyTag(
+                    label: 'Disetujui ${item.approved} ${item.unit ?? ''}'
+                        .trim(),
+                    color: AppColors.mint,
+                    background: AppColors.mintSoft,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

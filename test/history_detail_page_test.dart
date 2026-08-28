@@ -45,6 +45,44 @@ HistoryEntry _atkEntry() => HistoryEntry.fromJson({
   },
 });
 
+HistoryEntry _atkReplacementEntry() => HistoryEntry.fromJson({
+  'id': 'supplies-replacement',
+  'type': 'ATK',
+  'is_read': 1,
+  'code': 'ATK-DETAIL-REPLACEMENT',
+  'title': '3 item',
+  'daftarkebutuhan': [
+    {
+      'id': 121,
+      'name': 'Amplop Coklat A3',
+      'satuan': 'Buah',
+      'status': 'normal',
+      'requested': 7,
+      'approved': 7,
+    },
+    {
+      'id': '13G38',
+      'name': 'Album Foto',
+      'satuan': 'Pcs',
+      'status': 'replaced',
+      'requested': 3,
+      'approved': 0,
+      'replacedBy': 'Album Foto 10R',
+    },
+    {
+      'id': 229,
+      'name': 'Album Foto 10R',
+      'satuan': 'Pcs',
+      'status': 'replacement',
+      'requested': 3,
+      'approved': 1,
+      'origin_id': 'Album Foto',
+    },
+  ],
+  'created_at': '2026-08-21T08:58:43',
+  'status': 'partial',
+});
+
 HistoryEntry _roomEntry({bool includeFeatures = true}) => HistoryEntry.fromJson(
   {
     'id': 'booking',
@@ -116,6 +154,24 @@ void main() {
     expect(find.text('Nadia Pratama'), findsOneWidget);
     expect(find.text('Biro Umum'), findsOneWidget);
     expect(find.text('tidak-ditampilkan'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ATK replacement remains one request with fulfillment history', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      testApp(home: HistoryDetailPage(entry: _atkReplacementEntry())),
+    );
+
+    expect(find.text('2 item'), findsOneWidget);
+    expect(find.text('2 barang diajukan'), findsOneWidget);
+    expect(find.text('Album Foto'), findsOneWidget);
+    expect(find.text('Lain-lain'), findsOneWidget);
+    expect(find.text('Diminta 3 Pcs'), findsOneWidget);
+    expect(find.text('Dipenuhi dengan'), findsOneWidget);
+    expect(find.text('Album Foto 10R'), findsOneWidget);
+    expect(find.text('Disetujui 1 Pcs'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

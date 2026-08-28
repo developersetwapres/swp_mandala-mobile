@@ -312,7 +312,7 @@ void main() {
     });
   });
 
-  testWidgets('Lain-Lain submits a null ID without inventing a master ID', (
+  testWidgets('Lain-Lain submits a generated five-character ID', (
     tester,
   ) async {
     final repository = TestServiceCatalogRepository();
@@ -343,14 +343,17 @@ void main() {
     await tester.tap(find.byKey(const Key('submit_supply_request')));
     await tester.pump();
 
-    expect(repository.submittedSupply?.items.single.toJson(), {
-      'id': null,
+    final submittedItem = repository.submittedSupply!.items.single.toJson();
+    expect(submittedItem, {
+      'id': submittedItem['id'],
       'name': 'Label Printer',
       'satuan': 'Roll',
       'status': 'custom',
       'requested': 4,
       'approved': 0,
     });
+    expect(submittedItem['id'], isA<String>());
+    expect(submittedItem['id'], matches(RegExp(r'^[A-Z0-9]{5}$')));
   });
 
   testWidgets('request header and basket fit a compact phone', (tester) async {

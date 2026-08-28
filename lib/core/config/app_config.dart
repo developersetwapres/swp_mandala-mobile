@@ -6,7 +6,7 @@ abstract final class AppConfig {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://src.test/api',
+    defaultValue: 'https://umumswp-dev.setneg.go.id/api',
   );
 
   static const String mediaBaseUrl = String.fromEnvironment(

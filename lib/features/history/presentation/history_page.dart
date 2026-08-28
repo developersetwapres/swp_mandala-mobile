@@ -13,6 +13,7 @@ import '../domain/history_repository.dart';
 import 'history_controller.dart';
 import 'history_detail_page.dart';
 import 'history_presentation.dart';
+import 'history_supply_presentation.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({required this.repository, super.key});
@@ -514,7 +515,7 @@ class _HistoryCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            entry.displayTitle,
+            historyDisplayTitle(entry),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium,

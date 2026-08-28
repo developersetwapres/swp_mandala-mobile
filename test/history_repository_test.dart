@@ -58,6 +58,8 @@ void main() {
                     'status': 'normal',
                     'approved': 0,
                     'requested': 5,
+                    'origin_id': null,
+                    'replacedBy': null,
                   },
                   'malformed optional item',
                 ],
@@ -119,6 +121,8 @@ void main() {
       expect(entries[0].serviceType, HistoryServiceType.officeSupply);
       expect(entries[0].isRead, isFalse);
       expect(entries[0].supplyItems.single.requested, 5);
+      expect(entries[0].supplyItems.single.originId, isNull);
+      expect(entries[0].supplyItems.single.replacedBy, isNull);
       expect(entries[1].serviceType, HistoryServiceType.meetingRoom);
       expect(entries[1].room?.name, 'Ruang Rapat Buton');
       expect(entries[1].user?.employee?.bureauName, 'Biro Umum');
