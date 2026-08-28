@@ -4,6 +4,7 @@ import 'package:swp_mandala_mobile/core/theme/app_theme.dart';
 import 'package:swp_mandala_mobile/features/auth/domain/app_user.dart';
 import 'package:swp_mandala_mobile/features/home/home_page.dart';
 import 'package:swp_mandala_mobile/features/history/domain/history_entry.dart';
+import 'package:swp_mandala_mobile/features/history/domain/history_page_result.dart';
 import 'package:swp_mandala_mobile/features/history/domain/history_repository.dart';
 import 'package:swp_mandala_mobile/features/damage_report/damage_report_models.dart';
 import 'package:swp_mandala_mobile/features/meeting_room/meeting_room_models.dart';
@@ -90,11 +91,48 @@ class TestHistoryRepository implements HistoryRepository {
   ];
 
   @override
-  Future<List<HistoryEntry>> getHistory() async {
+  Future<List<HistoryEntry>> getHistory() async =>
+      (await getHistoryPage()).entries;
+
+  @override
+  Future<HistoryPageResult> getHistoryPage({
+    int page = 1,
+    String search = '',
+  }) async {
     calls += 1;
     if (error case final value?) throw value;
-    if (response case final value?) return value;
-    return entries;
+    final resolvedEntries = response != null ? await response! : entries;
+    final query = search.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? resolvedEntries
+        : resolvedEntries
+              .where((entry) => entry.searchText.contains(query))
+              .toList(growable: false);
+    const perPage = 5;
+    final lastPage = filtered.isEmpty ? 1 : (filtered.length / perPage).ceil();
+    final safePage = page.clamp(1, lastPage) as int;
+    final start = (safePage - 1) * perPage;
+    final pageEntries = filtered
+        .skip(start)
+        .take(perPage)
+        .toList(growable: false);
+    return HistoryPageResult(
+      entries: pageEntries,
+      currentPage: safePage,
+      lastPage: lastPage,
+      total: filtered.length,
+      from: pageEntries.isEmpty ? null : start + 1,
+      to: pageEntries.isEmpty ? null : start + pageEntries.length,
+      pageLinks: List.generate(
+        lastPage,
+        (index) => HistoryPageLink(
+          page: index + 1,
+          active: index + 1 == safePage,
+        ),
+      ),
+      previousPage: safePage > 1 ? safePage - 1 : null,
+      nextPage: safePage < lastPage ? safePage + 1 : null,
+    );
   }
 }
 

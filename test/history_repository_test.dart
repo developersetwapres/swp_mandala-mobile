@@ -37,6 +37,7 @@ void main() {
       final repository = _repository((request) async {
         expect(request.method, 'GET');
         expect(request.url.path, '/api/history-pengajuan');
+        expect(request.url.queryParameters, {'page': '1'});
         expect(request.headers['Authorization'], 'Bearer history-token');
         expect(request.headers['Accept'], 'application/json');
         return http.Response(
@@ -110,6 +111,19 @@ void main() {
                 'picture': ['https://src.test/storage/ac.jpg', 123],
               },
             ],
+            'links': {'prev': null, 'next': null},
+            'meta': {
+              'current_page': 1,
+              'last_page': 1,
+              'total': 3,
+              'from': 1,
+              'to': 3,
+              'links': [
+                {'label': '&laquo; Previous', 'page': null, 'active': false},
+                {'label': '1', 'page': 1, 'active': true},
+                {'label': 'Next &raquo;', 'page': 2, 'active': false},
+              ],
+            },
           }),
           200,
         );
@@ -135,7 +149,21 @@ void main() {
 
   test('empty history response is valid', () async {
     final repository = _repository(
-      (request) async => http.Response(jsonEncode({'data': []}), 200),
+      (request) async => http.Response(
+        jsonEncode({
+          'data': [],
+          'links': {'prev': null, 'next': null},
+          'meta': {
+            'current_page': 1,
+            'last_page': 1,
+            'total': 0,
+            'from': null,
+            'to': null,
+            'links': [],
+          },
+        }),
+        200,
+      ),
     );
     expect(await repository.getHistory(), isEmpty);
   });

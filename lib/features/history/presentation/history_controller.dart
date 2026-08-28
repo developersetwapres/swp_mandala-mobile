@@ -1,9 +1,8 @@
-// ignore_for_file: prefer_initializing_formals
-
 import 'package:flutter/foundation.dart';
 
 import '../domain/history_entry.dart';
 import '../domain/history_failure.dart';
+import '../domain/history_page_result.dart';
 import '../domain/history_repository.dart';
 
 enum HistoryFilter { all, meetingRoom, officeSupply, damage }
@@ -25,53 +24,42 @@ extension HistoryFilterPresentation on HistoryFilter {
 }
 
 class HistoryController extends ChangeNotifier {
-  HistoryController({
-    required HistoryRepository repository,
-    this.pageSize = 12,
-    this.loadMoreDelay = const Duration(milliseconds: 220),
-  }) : _repository = repository;
+  HistoryController({required HistoryRepository repository})
+    : _repository = repository;
 
   final HistoryRepository _repository;
-  final int pageSize;
-  final Duration loadMoreDelay;
-
-  List<HistoryEntry> _allEntries = const [];
+  HistoryPageResult? _page;
   HistoryFilter _filter = HistoryFilter.all;
   String _query = '';
-  int _visibleCount = 0;
   bool _initialLoading = false;
   bool _refreshing = false;
-  bool _loadingMore = false;
+  bool _loadingPage = false;
   HistoryFailure? _failure;
   HistoryFailure? _refreshFailure;
 
-  List<HistoryEntry> get allEntries => _allEntries;
+  List<HistoryEntry> get allEntries => _page?.entries ?? const [];
   HistoryFilter get filter => _filter;
   String get query => _query;
   bool get initialLoading => _initialLoading;
   bool get refreshing => _refreshing;
-  bool get loadingMore => _loadingMore;
+  bool get loadingPage => _loadingPage;
   HistoryFailure? get failure => _failure;
   HistoryFailure? get refreshFailure => _refreshFailure;
 
-  List<HistoryEntry> get matchingEntries {
-    final normalizedQuery = _query.trim().toLowerCase();
-    return _allEntries
-        .where((entry) {
-          final serviceType = _filter.serviceType;
-          if (serviceType != null && entry.serviceType != serviceType) {
-            return false;
-          }
-          return normalizedQuery.isEmpty ||
-              entry.searchText.contains(normalizedQuery);
-        })
-        .toList(growable: false);
-  }
+  List<HistoryEntry> get matchingEntries => allEntries.where((entry) {
+    final serviceType = _filter.serviceType;
+    return serviceType == null || entry.serviceType == serviceType;
+  }).toList(growable: false);
 
-  List<HistoryEntry> get visibleEntries =>
-      matchingEntries.take(_visibleCount).toList(growable: false);
-
-  bool get hasMore => _visibleCount < matchingEntries.length;
+  List<HistoryEntry> get visibleEntries => matchingEntries;
+  int get currentPage => _page?.currentPage ?? 1;
+  int get lastPage => _page?.lastPage ?? 1;
+  int get total => _page?.total ?? 0;
+  int? get from => _page?.from;
+  int? get to => _page?.to;
+  List<HistoryPageLink> get pageLinks => _page?.pageLinks ?? const [];
+  bool get hasPreviousPage => _page?.previousPage != null;
+  bool get hasNextPage => _page?.nextPage != null;
 
   Future<void> load() async {
     if (_initialLoading) return;
@@ -79,8 +67,7 @@ class HistoryController extends ChangeNotifier {
     _failure = null;
     notifyListeners();
     try {
-      _allEntries = await _repository.getHistory();
-      _visibleCount = pageSize;
+      _page = await _repository.getHistoryPage(search: _query);
     } on HistoryFailure catch (failure) {
       _failure = failure;
     } finally {
@@ -95,12 +82,14 @@ class HistoryController extends ChangeNotifier {
     _refreshFailure = null;
     notifyListeners();
     try {
-      _allEntries = await _repository.getHistory();
-      _visibleCount = pageSize;
+      _page = await _repository.getHistoryPage(
+        page: currentPage,
+        search: _query,
+      );
       _failure = null;
     } on HistoryFailure catch (failure) {
       _refreshFailure = failure;
-      if (_allEntries.isEmpty) _failure = failure;
+      if (_page == null) _failure = failure;
     } finally {
       _refreshing = false;
       notifyListeners();
@@ -110,28 +99,35 @@ class HistoryController extends ChangeNotifier {
   void setFilter(HistoryFilter value) {
     if (_filter == value) return;
     _filter = value;
-    _visibleCount = pageSize;
     notifyListeners();
   }
 
-  void setQuery(String value) {
+  Future<void> setQuery(String value) async {
     final normalized = value.trim();
     if (_query == normalized) return;
     _query = normalized;
-    _visibleCount = pageSize;
-    notifyListeners();
+    await _loadPage(1);
   }
 
-  Future<void> loadMore() async {
-    if (_loadingMore || !hasMore || _initialLoading) return;
-    _loadingMore = true;
+  Future<void> previousPage() => _loadPage(currentPage - 1);
+  Future<void> nextPage() => _loadPage(currentPage + 1);
+  Future<void> goToPage(int page) => _loadPage(page);
+
+  Future<void> _loadPage(int page) async {
+    if (_loadingPage || page < 1 || page > lastPage) return;
+    _loadingPage = true;
+    _refreshFailure = null;
     notifyListeners();
-    if (loadMoreDelay > Duration.zero) {
-      await Future<void>.delayed(loadMoreDelay);
+    try {
+      _page = await _repository.getHistoryPage(page: page, search: _query);
+      _failure = null;
+    } on HistoryFailure catch (failure) {
+      _refreshFailure = failure;
+      if (_page == null) _failure = failure;
+    } finally {
+      _loadingPage = false;
+      notifyListeners();
     }
-    _visibleCount = (_visibleCount + pageSize).clamp(0, matchingEntries.length);
-    _loadingMore = false;
-    notifyListeners();
   }
 
   void clearRefreshFailure() => _refreshFailure = null;

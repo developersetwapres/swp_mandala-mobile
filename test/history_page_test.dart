@@ -78,7 +78,7 @@ void main() {
     }
   });
 
-  testWidgets('client pagination loads the next segment at the list end', (
+  testWidgets('server pagination loads a selected page from the footer', (
     tester,
   ) async {
     final entries = List.generate(
@@ -96,22 +96,17 @@ void main() {
     expect(find.text('REQ-000'), findsOneWidget);
     expect(find.text('REQ-012'), findsNothing);
 
-    await tester.fling(
-      find.byKey(const Key('history_scroll')),
-      const Offset(0, -2400),
-      1800,
-    );
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.pumpAndSettle();
     await tester.dragUntilVisible(
-      find.text('REQ-014'),
+      find.byKey(const Key('history_page_3')),
       find.byKey(const Key('history_scroll')),
-      const Offset(0, -500),
+      const Offset(0, -320),
     );
+    await tester.tap(find.byKey(const Key('history_page_3')));
+    await tester.pumpAndSettle();
 
     expect(find.text('REQ-014'), findsOneWidget);
-    expect(find.text('Semua history sudah ditampilkan'), findsOneWidget);
-    expect(repository.calls, 1);
+    expect(find.text('Menampilkan 11–15 dari 15 pengajuan'), findsOneWidget);
+    expect(repository.calls, 2);
   });
 
   testWidgets('empty API and empty search have distinct states', (

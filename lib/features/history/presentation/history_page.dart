@@ -9,6 +9,7 @@ import '../../auth/presentation/profile_page.dart';
 import '../../home/primary_navigation_bar.dart';
 import '../domain/history_entry.dart';
 import '../domain/history_failure.dart';
+import '../domain/history_page_result.dart';
 import '../domain/history_repository.dart';
 import 'history_controller.dart';
 import 'history_detail_page.dart';
@@ -37,27 +38,17 @@ class _HistoryPageState extends State<HistoryPage> {
     _controller = HistoryController(repository: widget.repository);
     _controller.addListener(_handleControllerEvent);
     _controller.load();
-    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
-    _scrollController
-      ..removeListener(_handleScroll)
-      ..dispose();
+    _scrollController..dispose();
     _searchController.dispose();
     _controller
       ..removeListener(_handleControllerEvent)
       ..dispose();
     super.dispose();
-  }
-
-  void _handleScroll() {
-    if (!_scrollController.hasClients) return;
-    if (_scrollController.position.extentAfter < 260) {
-      _controller.loadMore();
-    }
   }
 
   void _handleControllerEvent() {
@@ -130,7 +121,7 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
               slivers: [
                 SliverToBoxAdapter(
-                  child: _HistoryHero(total: _controller.allEntries.length),
+                  child: _HistoryHero(total: _controller.total),
                 ),
                 SliverToBoxAdapter(
                   child: _HistoryControls(
@@ -192,7 +183,7 @@ class _HistoryPageState extends State<HistoryPage> {
         SliverFillRemaining(
           hasScrollBody: false,
           child: _HistoryEmpty(
-            allHistoryEmpty: _controller.allEntries.isEmpty,
+            allHistoryEmpty: _controller.total == 0,
             hasQuery: _controller.query.isNotEmpty,
             filter: _controller.filter,
             onReset: () {
@@ -219,10 +210,18 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       SliverToBoxAdapter(
         child: _PaginationFooter(
-          loading: _controller.loadingMore,
-          hasMore: _controller.hasMore,
-          visible: _controller.visibleEntries.length,
-          total: _controller.matchingEntries.length,
+          loading: _controller.loadingPage,
+          currentPage: _controller.currentPage,
+          lastPage: _controller.lastPage,
+          from: _controller.from,
+          to: _controller.to,
+          total: _controller.total,
+          pageLinks: _controller.pageLinks,
+          hasPreviousPage: _controller.hasPreviousPage,
+          hasNextPage: _controller.hasNextPage,
+          onPrevious: _controller.previousPage,
+          onNext: _controller.nextPage,
+          onPageSelected: _controller.goToPage,
         ),
       ),
     ];
@@ -584,39 +583,456 @@ class _HistoryCard extends StatelessWidget {
 class _PaginationFooter extends StatelessWidget {
   const _PaginationFooter({
     required this.loading,
-    required this.hasMore,
-    required this.visible,
+    required this.currentPage,
+    required this.lastPage,
+    required this.from,
+    required this.to,
     required this.total,
+    required this.pageLinks,
+    required this.hasPreviousPage,
+    required this.hasNextPage,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onPageSelected,
   });
 
   final bool loading;
-  final bool hasMore;
-  final int visible;
+  final int currentPage;
+  final int lastPage;
+  final int? from;
+  final int? to;
   final int total;
+  final List<HistoryPageLink> pageLinks;
+  final bool hasPreviousPage;
+  final bool hasNextPage;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final ValueChanged<int> onPageSelected;
+
+  /// `null` digunakan sebagai ellipsis (...).
+  List<int?> get _visiblePages {
+    // Kalau jumlah halaman sedikit, tampilkan semuanya.
+    if (lastPage <= 5) {
+      return List<int?>.generate(lastPage, (index) => index + 1);
+    }
+
+    // Posisi masih di awal.
+    //
+    // 1  2  3  ...  21
+    if (currentPage <= 3) {
+      return [1, 2, 3, null, lastPage];
+    }
+
+    // Posisi mendekati akhir.
+    //
+    // 1  ...  19  20  21
+    if (currentPage >= lastPage - 2) {
+      return [1, null, lastPage - 2, lastPage - 1, lastPage];
+    }
+
+    // Posisi di tengah.
+    //
+    // 1  ...  8  ...  21
+    return [1, null, currentPage, null, lastPage];
+  }
+
+  bool _isPageActive(int page) {
+    if (page == currentPage) {
+      return true;
+    }
+
+    return pageLinks.any((link) => link.page == page && link.active);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-      child: Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: loading
-              ? const SizedBox(
-                  key: Key('history_loading_more'),
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.3),
-                )
-              : Text(
-                  hasMore
-                      ? '$visible dari $total pengajuan'
-                      : 'Semua history sudah ditampilkan',
-                  key: const Key('history_pagination_status'),
-                  style: Theme.of(context).textTheme.bodySmall,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // =========================
+          // Pagination status
+          // =========================
+          SizedBox(
+            key: const Key('history_pagination_status'),
+            width: double.infinity,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: Text(
+                total == 0
+                    ? 'Tidak ada pengajuan'
+                    : 'Menampilkan ${from ?? 0}–${to ?? 0} dari $total pengajuan',
+                key: ValueKey(
+                  'pagination_status_${currentPage}_${from}_${to}_$total',
                 ),
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+
+          if (lastPage > 1) ...[
+            const SizedBox(height: 14),
+
+            // =========================
+            // Pagination controls
+            // =========================
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Untuk layar sangat kecil,
+                // gunakan versi compact.
+                if (constraints.maxWidth < 290) {
+                  return _CompactPagination(
+                    loading: loading,
+                    currentPage: currentPage,
+                    lastPage: lastPage,
+                    hasPreviousPage: hasPreviousPage,
+                    hasNextPage: hasNextPage,
+                    onPrevious: onPrevious,
+                    onNext: onNext,
+                  );
+                }
+
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Previous
+                    _PaginationNavigationButton(
+                      key: const Key('history_previous_page'),
+                      icon: Icons.chevron_left_rounded,
+                      tooltip: 'Halaman sebelumnya',
+                      enabled: hasPreviousPage && !loading,
+                      onPressed: onPrevious,
+                    ),
+
+                    const SizedBox(width: 6),
+
+                    // Nomor halaman
+                    ..._buildPageItems(),
+
+                    const SizedBox(width: 6),
+
+                    // Next
+                    _PaginationNavigationButton(
+                      key: const Key('history_next_page'),
+                      icon: Icons.chevron_right_rounded,
+                      tooltip: 'Halaman berikutnya',
+                      enabled: hasNextPage && !loading,
+                      onPressed: onNext,
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            // =========================
+            // Loading indicator
+            // =========================
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: loading
+                  ? const Padding(
+                      key: Key('history_loading_page'),
+                      padding: EdgeInsets.only(top: 12),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageItems() {
+    final widgets = <Widget>[];
+
+    for (var index = 0; index < _visiblePages.length; index++) {
+      final page = _visiblePages[index];
+
+      // Jarak antar item.
+      if (index > 0) {
+        widgets.add(const SizedBox(width: 6));
+      }
+
+      // Ellipsis
+      if (page == null) {
+        widgets.add(const _PaginationEllipsis());
+        continue;
+      }
+
+      // Page button
+      widgets.add(
+        _PaginationButton(
+          key: Key('history_page_$page'),
+          label: '$page',
+          selected: _isPageActive(page),
+          enabled: !loading,
+          onPressed: () => onPageSelected(page),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+}
+
+// ============================================================
+// PAGE BUTTON
+// ============================================================
+
+class _PaginationButton extends StatelessWidget {
+  const _PaginationButton({
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+    this.selected = false,
+    super.key,
+  });
+
+  final String label;
+  final bool enabled;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final colorScheme = theme.colorScheme;
+
+    final foregroundColor = selected
+        ? Colors.white
+        : enabled
+        ? AppColors.primaryStrong
+        : colorScheme.onSurfaceVariant.withValues(alpha: 0.40);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? AppColors.primaryStrong : Colors.transparent,
+        border: Border.all(
+          color: selected ? AppColors.primaryStrong : AppColors.line,
+          width: selected ? 1.4 : 1,
+        ),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: AppColors.primaryStrong.withValues(alpha: 0.16),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          customBorder: const CircleBorder(),
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              style: (textTheme.labelMedium ?? const TextStyle()).copyWith(
+                color: foregroundColor,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              ),
+              child: Text(label),
+            ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// PREVIOUS / NEXT BUTTON
+// ============================================================
+
+class _PaginationNavigationButton extends StatelessWidget {
+  const _PaginationNavigationButton({
+    required this.icon,
+    required this.tooltip,
+    required this.enabled,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final foregroundColor = enabled
+        ? AppColors.primaryStrong
+        : colorScheme.onSurfaceVariant.withValues(alpha: 0.32);
+
+    final borderColor = enabled
+        ? AppColors.line
+        : AppColors.line.withValues(alpha: 0.45);
+
+    return Tooltip(
+      message: tooltip,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: enabled ? 1 : 0.65,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: enabled ? onPressed : null,
+            customBorder: const CircleBorder(),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: borderColor),
+              ),
+              child: Icon(icon, size: 22, color: foregroundColor),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// ELLIPSIS (...)
+// ============================================================
+
+class _PaginationEllipsis extends StatelessWidget {
+  const _PaginationEllipsis();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: 24,
+      height: 40,
+      child: Center(
+        child: Text(
+          '…',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// COMPACT VERSION
+// Untuk device dengan lebar sangat kecil.
+// ============================================================
+
+class _CompactPagination extends StatelessWidget {
+  const _CompactPagination({
+    required this.loading,
+    required this.currentPage,
+    required this.lastPage,
+    required this.hasPreviousPage,
+    required this.hasNextPage,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final bool loading;
+  final int currentPage;
+  final int lastPage;
+  final bool hasPreviousPage;
+  final bool hasNextPage;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _PaginationNavigationButton(
+          key: const Key('history_previous_page'),
+          icon: Icons.chevron_left_rounded,
+          tooltip: 'Halaman sebelumnya',
+          enabled: hasPreviousPage && !loading,
+          onPressed: onPrevious,
+        ),
+
+        const SizedBox(width: 12),
+
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 40,
+          constraints: const BoxConstraints(minWidth: 74),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primaryStrong.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.primaryStrong.withValues(alpha: 0.12),
+            ),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 160),
+            child: Text(
+              '$currentPage / $lastPage',
+              key: ValueKey('compact_page_$currentPage'),
+              style: textTheme.labelMedium?.copyWith(
+                color: AppColors.primaryStrong,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        _PaginationNavigationButton(
+          key: const Key('history_next_page'),
+          icon: Icons.chevron_right_rounded,
+          tooltip: 'Halaman berikutnya',
+          enabled: hasNextPage && !loading,
+          onPressed: onNext,
+        ),
+      ],
     );
   }
 }
