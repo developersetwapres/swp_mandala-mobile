@@ -900,7 +900,7 @@ class _DamageIdentityPanel extends StatelessWidget {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Lokasi kerusakan',
-              hintText: 'Contoh: Gedung 2, Lantai 3',
+              hintText: 'Contoh: Gedung 2, Lantai 3, Ruang Rapat',
               prefixIcon: const Icon(Icons.location_on_outlined),
               errorText: locationError,
             ),

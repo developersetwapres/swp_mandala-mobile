@@ -46,7 +46,6 @@ class MeetingRoom {
   factory MeetingRoom.fromJson(Map<String, dynamic> json) {
     final id = _requiredString(json['id']);
     final name = _requiredString(json['nama_ruangan']);
-    final location = _requiredString(json['location']);
     final capacity = _requiredString(json['kapasitas']);
     final maximumCapacityLabel = _requiredString(json['kapasitas_max']);
     final status = _requiredString(json['status']).toLowerCase();
